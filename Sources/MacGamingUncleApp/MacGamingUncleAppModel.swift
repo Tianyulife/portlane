@@ -32,6 +32,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     private var backgroundSteamWindowTask: Task<Void, Never>?
     private var steamInstallSubmittedAt: [UInt64: Date] = [:]
     @Published var gameLaunchStates: [UInt64: GameLaunchState] = [:]
+    @Published private(set) var gameLaunchReports: [UInt64: GameLaunchReport] = [:]
     private var gameLaunchMonitors: [UInt64: Task<Void, Never>] = [:]
     @Published private(set) var steamLaunchRelayActive = false
     @Published private(set) var steamLaunchRelayDetail = ""
@@ -553,7 +554,8 @@ final class MacGamingUncleAppModel: ObservableObject {
 
     func launchSteamGame(_ game: SteamGame, fromSteamPlay: Bool = false) async {
         guard !isWorking, gameLaunchStates[game.appID]?.blocksLaunch != true else { return }
-        gameLaunchStates[game.appID] = .preparing
+        gameLaunchReports[game.appID] = GameLaunchReport(appID: game.appID, name: game.name)
+        updateGameLaunch(game.appID, .preparing, L("检查游戏文件与运行组件"))
         await perform(L("正在为 \(game.name) 选择最佳图形后端…")) {
             guard fromSteamPlay || SteamDownloadBridge.permitsPlay(
                 manifestReady: (try? SteamScanner.refreshed(game).isReadyToPlay) == true,
@@ -571,10 +573,10 @@ final class MacGamingUncleAppModel: ObservableObject {
             let executable = try SteamExecutableResolver.shippingExecutable(for: game)
             let runningPath = try WinePath.windowsPath(for: executable, in: bottle)
             if try await GameProcessProbe.isRunning(windowsPath: runningPath) {
-                self.gameLaunchStates[game.appID] = .running
-                self.monitorGameLaunch(appID: game.appID, windowsPath: runningPath)
+                self.monitorGameLaunch(appID: game.appID, windowsPath: runningPath, alreadyRunning: true)
                 return
             }
+            self.updateGameLaunch(game.appID, .preparing, L("分析游戏兼容性与图形后端"))
             self.status = L("正在快速检查游戏兼容性…")
             let analysis = try await Task.detached(priority: .userInitiated) {
                 try PEAnalyzer.analyze(at: executable, steamAppID: game.appID)
@@ -583,6 +585,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             let recipe = self.recipeRepository.match(analysis)
             if (configuration.preferredRenderer == .dxmt || recipe?.profiles.first?.renderer == .dxmt),
                !self.rendererOverlays.contains(where: { $0.kind == .dxmt }) {
+                self.updateGameLaunch(game.appID, .preparing, L("下载并安装所需的 DXMT 组件"))
                 self.status = L("正在安装 \(game.name) 所需的 DXMT 0.80…")
                 _ = try await self.communityDXMT.installLatest()
                 self.rendererOverlays = await self.overlayImporter.installed()
@@ -606,6 +609,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                 recipe: recipe,
                 installed: installedRenderers
             )
+            self.updateGameLaunch(game.appID, .preparing, L("应用专属 Mac 配置") + " · " + resolution.renderer.rawValue.uppercased())
             let recipeProfile = recipe?.profiles.first { $0.renderer == resolution.renderer }
             let recipeArguments = recipeProfile?.arguments ?? []
             let displayPolicy = GameDisplaySnapshot.policy(
@@ -760,6 +764,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             )
             let reusingSteam = self.steamSessionManager.canReuse(descriptor) &&
                 SteamCompatibilityManager.isLoggedOn(in: bottle)
+            self.updateGameLaunch(game.appID, .preparing, reusingSteam ? L("连接已登录的 Steam 会话") : L("检查共享会话并准备 Steam 运行环境"))
             if !reusingSteam {
                 let downloads: [SteamBridgeDownload]
                 if SteamCompatibilityManager.isLoggedOn(in: bottle), let bridge = self.downloadBridge() {
@@ -780,6 +785,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                     }
                 }
                 self.steamSessionManager.didStop()
+                self.updateGameLaunch(game.appID, .preparing, L("配置 Wine、显示与手柄支持"))
                 self.status = L("正在准备全局 Steam 会话…")
                 try await gamingProvider.prepareBottleForInstaller(bottle)
                 // Apply only after all old Wine processes have stopped. The reg
@@ -833,44 +839,61 @@ final class MacGamingUncleAppModel: ObservableObject {
                 : needsWarmupProtection
                 ? L("\(game.name) 正在首次构建图形缓存，可能需要几分钟…")
                 : L("正在由 Steam 启动 \(game.name) · \(architecture) + \(resolution.renderer.rawValue.uppercased())\(metal4Enabled ? " + Metal 4" : "")")
+            self.gameLaunchReports[game.appID]?.logURL = log
+            self.updateGameLaunch(game.appID, .preparing, L("向 Steam 发送启动命令"))
             _ = try await gamingProvider.launchDetached(launchPlan, logURL: log)
             self.steamSessionManager.didLaunch(descriptor, reused: reusingSteam)
             self.monitorGameLaunch(appID: game.appID, windowsPath: try WinePath.windowsPath(for: executable, in: bottle))
         }
-        if gameLaunchStates[game.appID] == .preparing { gameLaunchStates[game.appID] = .failed }
+        if gameLaunchStates[game.appID] == .preparing {
+            let failedStep = gameLaunchReports[game.appID]?.steps.last?.detail ?? ""
+            updateGameLaunch(game.appID, .failed, L("启动失败") + " · " + failedStep,
+                             error: lastError ?? L("启动操作已取消"))
+        }
     }
 
-    private func monitorGameLaunch(appID: UInt64, windowsPath: String) {
+    private func updateGameLaunch(_ appID: UInt64, _ state: GameLaunchState, _ detail: String, error: String? = nil) {
+        gameLaunchStates[appID] = state
+        gameLaunchReports[appID]?.update(state, detail: detail, error: error)
+    }
+
+    private func monitorGameLaunch(appID: UInt64, windowsPath: String, alreadyRunning: Bool = false) {
         gameLaunchMonitors[appID]?.cancel()
-        gameLaunchStates[appID] = .waiting
+        updateGameLaunch(appID, alreadyRunning ? .running : .waiting, alreadyRunning ? L("检测到游戏进程") : L("启动命令已发送，等待游戏进程（最多 120 秒）"))
         gameLaunchMonitors[appID] = Task { [weak self] in
             let deadline = Date().addingTimeInterval(120)
-            var didRun = false
+            var didRun = alreadyRunning
+            var firstSeenAt: Date? = alreadyRunning ? Date().addingTimeInterval(-15) : nil
             var consecutiveMissing = 0
             while !Task.isCancelled {
                 do {
                     let running = try await GameProcessProbe.isRunning(windowsPath: windowsPath)
                     guard let self, !Task.isCancelled else { return }
                     if running {
+                        if firstSeenAt == nil { firstSeenAt = Date() }
                         didRun = true
                         consecutiveMissing = 0
-                        self.gameLaunchStates[appID] = .running
+                        self.updateGameLaunch(appID, .running, L("检测到游戏进程"))
                     } else if didRun {
                         consecutiveMissing += 1
                         if consecutiveMissing >= 2 {
-                            self.gameLaunchStates[appID] = .idle
+                            if let firstSeenAt, Date().timeIntervalSince(firstSeenAt) < 15 {
+                                self.updateGameLaunch(appID, .unconfirmed, L("游戏进程很快退出"), error: L("进程启动后很快退出，可能是正常关闭或启动异常。请查看日志确认。"))
+                            } else {
+                                self.updateGameLaunch(appID, .idle, L("游戏进程已退出"))
+                            }
                             self.gameLaunchMonitors[appID] = nil
                             return
                         }
                     } else if Date() >= deadline {
-                        self.gameLaunchStates[appID] = .unconfirmed
+                        self.updateGameLaunch(appID, .unconfirmed, L("未能确认游戏启动"), error: L("120 秒内未检测到游戏进程。请检查 Steam 登录、下载校验或启动弹窗，并查看日志；游戏也可能仍在准备中。"))
                         self.gameLaunchMonitors[appID] = nil
                         return
                     }
                     try await Task.sleep(for: .seconds(2))
                 } catch {
                     if Task.isCancelled { return }
-                    self?.gameLaunchStates[appID] = .unconfirmed
+                    self?.updateGameLaunch(appID, .unconfirmed, L("无法检查游戏进程"), error: error.localizedDescription)
                     self?.gameLaunchMonitors[appID] = nil
                     return
                 }

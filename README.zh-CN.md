@@ -49,7 +49,7 @@ Portlane 的空间音频运行时支持游戏通过 **Windows Spatial Audio** �
 - 自己的 Steam 账户与合法拥有的游戏。
 - 从源码构建需要 Xcode 26 和兼容的 Swift 6 工具链。涉及 macOS 26 API 的功能需要 SDK 26 或更高版本才能编译。
 
-下载 [Portlane 0.5.0 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/Portlane-0.5.0-macOS-arm64.dmg) 和 [空间音频 Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz)。完整资源与 SHA-256 校验文件见 [Release 页面](https://github.com/Tianyulife/portlane/releases/tag/v0.5.0)。
+下载 [Portlane 0.5.1 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/Portlane-0.5.1-macOS-arm64.dmg) 和 [空间音频 Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz)。完整资源与 SHA-256 校验文件见 [Release 页面](https://github.com/Tianyulife/portlane/releases/tag/v0.5.1)。
 
 1. 打开 DMG，将 **Portlane** 拖到 **Applications（应用程序）**，再从应用程序目录打开。
 2. 解压 Wine 的 `.tar.xz`，得到 `wine-runtime` 文件夹。
@@ -125,7 +125,7 @@ swift build -c release
 swift run macgamingunclectl --json doctor
 ```
 
-最近一次本地 Swift 测试执行 111 项，4 项可选集成测试跳过，无失败。启动衔接回归测试覆盖拦截、重复请求、非受管理调用、重连和租约过期；Release 构建及打包资源、签名检查也已通过。这些验证不代表所有 Steam 更新与游戏版本都兼容。
+最近一次本地 Swift 测试执行 117 项，4 项可选集成测试跳过，无失败。启动衔接回归测试覆盖拦截、重复请求、非受管理调用、重连和租约过期；Release 构建及打包资源、签名检查也已通过。这些验证不代表所有 Steam 更新与游戏版本都兼容。
 
 更多资料：[架构说明](docs/ARCHITECTURE.md)、[运行时供应链](docs/RUNTIME_SUPPLY_CHAIN.md)、[测试指南](docs/TESTING.md)、[GPTK 下载与导入](docs/GPTK_DISTRIBUTION.md)。
 

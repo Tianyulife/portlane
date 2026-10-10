@@ -39,6 +39,7 @@ struct ContentView: View {
                 Text(AppBrand.name).font(.system(size: 18, weight: .medium))
                 Text(L("Mac 兼容设置")).font(.system(size: 13)).foregroundStyle(IndiePalette.secondaryText)
                 Spacer()
+                ControllerWindowReturnButton(manager: model.controllerManager)
                 Label(model.steamLaunchRelayActive ? L("Steam 启动衔接已连接") : L("等待 Steam 启动衔接"),
                       systemImage: model.steamLaunchRelayActive ? "checkmark.circle.fill" : "circle")
                     .font(.caption).foregroundStyle(model.steamLaunchRelayActive ? IndiePalette.green : IndiePalette.secondaryText)
@@ -80,10 +81,13 @@ struct ContentView: View {
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             HStack {
-                if model.isWorking { ProgressView().controlSize(.mini) }
-                Text(model.isWorking ? model.status : model.steamLaunchRelayActive ? L("保持 Mac 管理器打开，Steam 的开始游戏操作会先应用单游戏配置") : L("打开官方 Steam 并等待连接后，开始游戏操作才能应用 Mac 配置"))
+                if model.isWorking && !model.gameLaunchStates.values.contains(.preparing) { ProgressView().controlSize(.mini) }
+                Text(model.isWorking && !model.gameLaunchStates.values.contains(.preparing) ? model.status : model.steamLaunchRelayActive ? L("保持 Mac 管理器打开，Steam 的开始游戏操作会先应用单游戏配置") : L("打开官方 Steam 并等待连接后，开始游戏操作才能应用 Mac 配置"))
                     .font(.caption).lineLimit(1)
                 Spacer()
+                if destination != .diagnostics {
+                    GameLaunchStatusLine { select(.diagnostics) }
+                }
             }.foregroundStyle(IndiePalette.secondaryText).padding(.horizontal, 20).frame(height: 30)
                 .background(IndiePalette.topBar)
         }

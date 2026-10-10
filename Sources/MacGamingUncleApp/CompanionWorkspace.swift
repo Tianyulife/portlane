@@ -145,29 +145,10 @@ struct CompanionDiagnosticsView: View {
                 Text(model.steamLaunchRelayDetail).font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 24).padding(.vertical, 12)
             }
-            if !model.gameLaunchStates.isEmpty {
-                VStack(spacing: 8) {
-                    ForEach(model.gameLaunchStates.keys.sorted(), id: \.self) { appID in
-                        HStack {
-                            Text(model.steamGames.first(where: { $0.appID == appID })?.name ?? String(appID))
-                            Spacer()
-                            Text(launchTitle(model.gameLaunchStates[appID] ?? .idle)).foregroundStyle(.secondary)
-                        }
-                    }
-                }.padding(24)
-            }
+            GameLaunchProgressView()
             DiagnosticsContent()
         }
     }
 
-    private func launchTitle(_ state: GameLaunchState) -> String {
-        switch state {
-        case .idle: L("游戏已退出")
-        case .preparing: L("正在应用配置")
-        case .waiting: L("等待游戏启动")
-        case .running: L("游戏运行中")
-        case .unconfirmed: L("启动尚未确认")
-        case .failed: L("启动失败")
-        }
-    }
+
 }

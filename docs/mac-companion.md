@@ -59,3 +59,17 @@ The local app is now Portlane (引航), with a Steam blue-black tile and a MacBo
 The original bundle identifier, preference domain, Bottle/runtime paths, runtime marker comparisons and executable/package target names remain stable so the rename preserves existing Steam login and game configuration. `portlane://` is added while legacy URL aliases continue to work. Old runtime display names are mapped at presentation time; installed manifests are not rewritten. No Dock behavior or Wine runtime binary has been changed.
 
 The surrounding tile and screen use an explicit sRGB navy-to-blue gradient (#0c1e3b / #176c97) coordinated with Steam. The original Steam circle is enlarged by 50% (600 px source placement versus 400 px); a thin silver MacBook outline and lower chassis identify the Mac. Its original artwork and gradient are preserved. SVG, PNG, 16–1024 px iconset, app ICNS and the packaged in-app mark are synchronized. Large and small previews were inspected.
+
+## Controller return to game
+
+The companion observes background GameController events. Menu (≡) + B explicitly requests return to the most recently foregrounded managed game; ordinary B is only handled while the companion is foreground. The header offers the same return action when a target exists, otherwise it offers minimization.
+
+Targets are matched against known game executable paths and their PID/start-time identity. Unrelated applications do not replace the remembered game; exited or reused process identities are discarded, and ambiguous executable matches are excluded. Before activation, the process identity and a normal game-sized window are checked again. The companion acquires activation rights and transfers them to the game's native window-owning application. No screen capture or Accessibility permission is requested.
+
+Xbox/Home remains a macOS system action. The Menu+B chord avoids depending on delivery of that reserved button. Automated tests cover focus history and stale identities; physical-controller return from the system Dock/overlay still requires live validation.
+
+### 游戏启动进度
+
+主界面右下角在每次 Steam 游戏启动时显示一行状态，确认游戏进程已运行后自动消失；失败或未确认时保留提示，点击可进入诊断查看详情。详细启动面板位于诊断页，覆盖 Portlane 启动入口和官方 Steam Play 衔接。步骤包括文件/运行组件检查、兼容性分析、单游戏配置、Steam 会话准备、发送命令及等待进程，记录各阶段耗时。启动命令提交成功不等于游戏运行成功，只有进程探测成功才显示“检测到游戏进程”。120 秒内没有发现进程会标为“未能确认”，进程短时间退出也会保留提示，不推断具体崩溃原因。
+
+诊断页的错误和时间线在本次应用运行期间保留，不受关闭通用错误提示或切换页面影响；可展开详情、复制诊断、打开启动日志。多个游戏的最近一次启动可在面板中切换，重试会刷新该游戏记录。启动面板不会自动抢占游戏焦点。

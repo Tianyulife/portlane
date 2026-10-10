@@ -16,6 +16,7 @@ struct MacGamingUncleApplication: App {
                 .onOpenURL { model.handleDeepLink($0) }
                 .onAppear {
                     appDelegate.model = model
+                    GameFocusReturn.shared.bind(model: model)
                     if #available(macOS 26, *) { AutomaticFrameInterpolation.shared.bind(model: model) }
                 }
         }

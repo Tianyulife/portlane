@@ -32,6 +32,7 @@ final class ControllerManager: ObservableObject {
     private var hapticPlayers: [UUID: any CHHapticPatternPlayer] = [:]
 
     init() {
+        GCController.shouldMonitorBackgroundEvents = true
         let center = NotificationCenter.default
         for name in [
             Notification.Name.GCControllerDidConnect,
@@ -145,6 +146,26 @@ final class ControllerManager: ObservableObject {
 
     private func installInputHandler(for controller: GCController, id: UUID) {
         if let gamepad = controller.extendedGamepad {
+            gamepad.buttonB.pressedChangedHandler = { [weak self, weak gamepad] _, _, pressed in
+                guard pressed else { return }
+                // Capture foreground ownership before hopping to the main actor:
+                // a game input must not become a window command after activation.
+                let returnChord = gamepad?.buttonMenu.isPressed == true
+                let wasForeground = NSRunningApplication.current.isActive
+                Task { @MainActor in
+                    if returnChord {
+                        await GameFocusReturn.shared.returnToGame()
+                        return
+                    }
+                    guard wasForeground else { return }
+                    if GameFocusReturn.shared.canReturn,
+                       NSApp.keyWindow?.attachedSheet == nil,
+                       !(NSApp.keyWindow?.firstResponder is NSTextView) {
+                        if await GameFocusReturn.shared.returnToGame() { return }
+                    }
+                    self?.minimizeCompanionWindow(fromController: true)
+                }
+            }
             gamepad.valueChangedHandler = { [weak self] _, element in
                 let label = element.localizedName ?? L("手柄输入")
                 Task { @MainActor in self?.recordInput(label, id: id) }
@@ -155,6 +176,19 @@ final class ControllerManager: ObservableObject {
                 Task { @MainActor in self?.recordInput(label, id: id) }
             }
         }
+    }
+
+    func minimizeCompanionWindow(fromController: Bool = false) {
+        guard !fromController || NSApp.isActive,
+              let window = NSApp.windows.first(where: {
+                  $0.title == AppBrand.name && $0.isVisible && !$0.isMiniaturized
+              }),
+              window.attachedSheet == nil,
+              window.styleMask.contains(.miniaturizable) else { return }
+        if fromController, let editor = window.firstResponder as? NSTextView,
+           editor.isEditable { return }
+        window.miniaturize(nil)
+        NSApp.hide(nil)
     }
 
     private func recordInput(_ label: String, id: UUID) {

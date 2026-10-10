@@ -726,3 +726,28 @@ Steam 启动衔接尚未连接	Steam Play relay is not connected yet
 文件夹名称	Folder name
 请选择文件夹路径	Enter a folder path
 文件夹名称无效	Invalid folder name
+返回当前游戏	Return to current game
+检查游戏文件与运行组件	Checking game files and runtime components
+分析游戏兼容性与图形后端	Analyzing compatibility and graphics backend
+下载并安装所需的 DXMT 组件	Downloading and installing the required DXMT component
+应用专属 Mac 配置	Applying per-game Mac settings
+连接已登录的 Steam 会话	Connecting to the signed-in Steam session
+检查共享会话并准备 Steam 运行环境	Checking the shared session and preparing Steam
+配置 Wine、显示与手柄支持	Configuring Wine, display and controller support
+向 Steam 发送启动命令	Sending the launch command to Steam
+启动操作已取消	Launch was cancelled
+检测到游戏进程	Game process detected
+启动命令已发送，等待游戏进程（最多 120 秒）	Launch command sent; waiting for the game process (up to 120 seconds)
+游戏进程很快退出	Game process exited shortly after launch
+进程启动后很快退出，可能是正常关闭或启动异常。请查看日志确认。	The process exited shortly after launch. This may be a normal close or a launch problem. Check the log for details.
+游戏进程已退出	Game process exited
+未能确认游戏启动	Game launch could not be confirmed
+120 秒内未检测到游戏进程。请检查 Steam 登录、下载校验或启动弹窗，并查看日志；游戏也可能仍在准备中。	No game process detected within 120 seconds. Check Steam sign-in, download verification, launch dialogs and the log; the game may still be preparing.
+无法检查游戏进程	Unable to check the game process
+启动进度	Launch progress
+其他启动记录	Other launch attempts
+收起详情	Hide details
+查看详情	Show details
+复制启动诊断	Copy launch diagnostics
+查看启动日志	View launch log
+查看启动诊断	View launch diagnostics

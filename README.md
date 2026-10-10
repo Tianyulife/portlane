@@ -49,7 +49,7 @@ Portlane's workspace has three main pages: **Game configuration**, **Runtime com
 - Your own Steam account and licensed games.
 - Xcode 26 with a compatible Swift 6 toolchain to build the app. Features using macOS 26 APIs need SDK 26 or later to compile.
 
-Download the [Portlane 0.5.0 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/Portlane-0.5.0-macOS-arm64.dmg) and [spatial audio Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz). All assets and SHA-256 files are on the [Release page](https://github.com/Tianyulife/portlane/releases/tag/v0.5.0).
+Download the [Portlane 0.5.1 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/Portlane-0.5.1-macOS-arm64.dmg) and [spatial audio Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz). All assets and SHA-256 files are on the [Release page](https://github.com/Tianyulife/portlane/releases/tag/v0.5.1).
 
 1. Open the DMG, drag **Portlane** to **Applications**, then open it from that folder.
 2. Extract the Wine `.tar.xz` to obtain the `wine-runtime` folder.
@@ -125,7 +125,7 @@ swift build -c release
 swift run macgamingunclectl --json doctor
 ```
 
-The latest local Swift suite completed 111 tests with four optional integration skips and no failures. Relay regression tests cover interception, duplicate requests, unmanaged calls, reconnection, and lease expiry. Release builds and packaged resource/signature checks also passed. These checks do not establish compatibility with every Steam or game update.
+The latest local Swift suite completed 117 tests with four optional integration skips and no failures. Relay regression tests cover interception, duplicate requests, unmanaged calls, reconnection, and lease expiry. Release builds and packaged resource/signature checks also passed. These checks do not establish compatibility with every Steam or game update.
 
 More details: [architecture](docs/ARCHITECTURE.md), [runtime supply chain](docs/RUNTIME_SUPPLY_CHAIN.md), [testing](docs/TESTING.md), [GPTK distribution](docs/GPTK_DISTRIBUTION.md).
 
