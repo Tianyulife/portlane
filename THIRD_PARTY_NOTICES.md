@@ -1,6 +1,6 @@
 # Third-party notices
 
-Indie does not redistribute these components in this repository. When users or release manifests install them, their own licenses apply.
+Portlane does not redistribute the runtime components listed below in this repository. When users or release manifests install them, their own licenses apply.
 
 | Component | Purpose | License / terms |
 |---|---|---|
@@ -18,9 +18,11 @@ Indie does not redistribute these components in this repository. When users or r
 | GnuTLS, GMP, Nettle | Wine TLS and cryptography support | LGPL-2.1-or-later / LGPL-3.0-or-later and component-specific notices |
 | libinotify-kqueue | kqueue-backed filesystem notifications for wineserver | MIT |
 
-The interface includes the Steam logo asset retrieved from Valve's official
-Steam static asset host (`store.fastly.steamstatic.com`) solely to identify the
-Steam installation step. Steam and the Steam logo are trademarks of Valve
-Corporation; Indie is not affiliated with Valve.
+The interface includes a Steam logo retrieved from Valve's official Steam static
+asset host (`store.fastly.steamstatic.com`). The Portlane icon also composites the
+original circular icon extracted from a locally installed Steam.app into a MacBook
+illustration. Steam and the Steam logo are trademarks of Valve Corporation; this
+artwork is not covered by the project's Apache source-code license. Portlane is
+not affiliated with Valve or Apple.
 
 Runtime releases must include exact notices and corresponding-source links for their pinned versions.

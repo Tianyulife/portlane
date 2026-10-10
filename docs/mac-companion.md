@@ -1,6 +1,6 @@
 # Mac compatibility companion
 
-The local app now owns compatibility settings rather than reproducing Steam's store and library. No remote repository changes or publishing are part of this change.
+The local app now owns compatibility settings rather than reproducing Steam's store and library. The current source is maintained in the independent Portlane repository.
 
 ## Pages
 
@@ -10,7 +10,7 @@ The local app now owns compatibility settings rather than reproducing Steam's st
 | Runtime components | Wine install/import/select/delete, GPTK install/cancel/import, DXMT/DXVK/VKD3D import, Bottle directories, Windows Steam installation, link to official Steam downloads |
 | Diagnostics | System checks and refresh, Steam Play relay status/errors, per-game launch status, runtime log folder |
 | Mac controllers | Device discovery and existing controller tools, opened from the sidebar |
-| Global preferences | Language, update channel and global rendering defaults, opened from the sidebar and standard macOS Settings |
+| Global preferences | Language and global rendering defaults, opened from the sidebar and standard macOS Settings |
 | First run | Existing environment setup and Steam sign-in flow |
 
 Home, Store and Library are removed from the visible navigation. Purchase, installation, updates, downloads, Steam Input, achievements and launch arguments stay in Windows Steam. Legacy store/library source is retained internally for compatibility while it is no longer a user-facing destination. Old navigation deep links map to the new configuration area or official Steam.
