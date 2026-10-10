@@ -39,7 +39,6 @@ struct ContentView: View {
                 Text(AppBrand.name).font(.system(size: 18, weight: .medium))
                 Text(L("Mac 兼容设置")).font(.system(size: 13)).foregroundStyle(IndiePalette.secondaryText)
                 Spacer()
-                ControllerWindowReturnButton(manager: model.controllerManager)
                 Label(model.steamLaunchRelayActive ? L("Steam 启动衔接已连接") : L("等待 Steam 启动衔接"),
                       systemImage: model.steamLaunchRelayActive ? "checkmark.circle.fill" : "circle")
                     .font(.caption).foregroundStyle(model.steamLaunchRelayActive ? IndiePalette.green : IndiePalette.secondaryText)

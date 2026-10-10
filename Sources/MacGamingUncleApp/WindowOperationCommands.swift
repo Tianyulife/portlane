@@ -2,24 +2,6 @@ import AppKit
 import IndieCore
 import SwiftUI
 
-struct ControllerWindowReturnButton: View {
-    @ObservedObject var manager: ControllerManager
-    @ObservedObject private var gameFocus = GameFocusReturn.shared
-
-    var body: some View {
-        if !manager.devices.isEmpty {
-            Button {
-                if gameFocus.canReturn {
-                    Task { await gameFocus.returnToGame() }
-                } else { manager.minimizeCompanionWindow() }
-            } label: {
-                Label(gameFocus.canReturn ? "≡ + B · " + L("返回当前游戏") : "B · " + L("最小化窗口"), systemImage: "gamecontroller")
-            }
-            .font(.caption)
-        }
-    }
-}
-
 /// Use the responder chain so commands operate on the active native window.
 /// Close (Command-W) remains the standard File menu command.
 struct WindowOperationCommands: Commands {
