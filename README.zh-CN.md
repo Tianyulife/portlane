@@ -2,15 +2,32 @@
   <img src="Assets/PortlaneIcon.png" width="144" alt="Portlane 图标">
   <h1>Portlane · 引航</h1>
   <p><strong>在 Mac 上使用 Windows Steam，为每款游戏配置专属兼容设置。</strong></p>
-  <p>Apple Silicon · SwiftUI / AppKit · Wine · D3DMetal</p>
+  <p>对象空间音频 · 7.1.4 输出验证 · Apple Silicon · Wine · D3DMetal</p>
   <p><a href="README.md">English</a> · 简体中文</p>
 </div>
 
 Portlane 管理 Windows Steam 游戏在 Mac 上运行所需的环境。浏览商店、安装游戏、管理下载和点击“开始游戏”，都在官方 Windows Steam 中完成；图形后端、兼容规则、手柄适配和启动诊断，由 Portlane 管理。
 
+**空间音频是 Portlane 的核心特点。** 我们将 Windows 游戏的对象空间音频接入 macOS 原生音频渲染，保留声音的位置与高度信息，并已在本机验证 7.1.4 输出链路。用户实机确认《黑神话：悟空》的全景声渲染正常。
+
 游玩时保持 Portlane 打开。顶部显示 **Steam Play relay connected（Steam 启动衔接已连接）** 后，从 Steam 桌面界面启动受支持的游戏，会先应用该游戏保存的 Mac 配置。
 
 ![Portlane 游戏配置界面](docs/screenshots/portlane/game-configuration.jpg)
+
+## 核心特点：Windows 游戏空间音频
+
+Portlane 的空间音频运行时支持游戏通过 **Windows Spatial Audio** 提交静态声床与动态音频对象，再由 **macOS CoreAudio Spatial Mixer** 渲染。声音对象的位置与音频数据同步传递，设备的原生声道顺序和顶部方向标签得到保留，让支持对象音频的 Windows 游戏在 Mac 上使用空间渲染路径。
+
+- **包含高度方向的多声道输出：** 本机已验证 7.1.4（12 声道、48 kHz）端点渲染链路，并测试 5.1.2 布局与立体声回退。
+- **真实游戏验证：** 《黑神话：悟空》已由用户实机确认全景声渲染正常；《双影奇境》在空间音频服务版运行时和 7.1.4 输出下完成短测，画面、操作和声音正常。
+- **运行时验证：** `11.0.9-services.1` 在 7.1.4 输出下执行 3,090 项空间音频检查，0 失败、0 跳过，保留 2 项既有 todo。
+- **逐游戏诊断：** 可以为单款游戏启用空间音频诊断日志，检查端点、对象容量与渲染状态。
+
+使用时，在 **运行组件** 中导入并选择包含空间音频补丁的运行时（当前验证版本为 `11.0.9-services.1`），在 macOS 中配置输出设备，并在支持的游戏中启用空间／全景声音频选项。应用默认下载的旧 `11.0.2` 运行时尚未包含这套支持。
+
+支持范围是 Windows 对象音频到 CoreAudio 的渲染；游戏需要实际提交空间对象，多声道设备需要暴露正确的声道布局。Dolby Atmos 编码直通和头部追踪尚未实现，实体扬声器方向、设备切换与长时间运行仍需进一步验收。
+
+实现源自 Switchyard Wine 的空间音频补丁，并针对本项目运行时进行了适配与验证。详见 [实现与来源](docs/SPATIAL_AUDIO.md)、[验证记录](docs/SPATIAL_AUDIO_VALIDATION.md)。
 
 ## Steam 与 Portlane 的分工
 
@@ -67,7 +84,7 @@ scripts/build-dmg.sh
 
 - **图形与性能：** 渲染后端、同步方式、虚拟桌面及分辨率、Apple Metal HUD、MetalFX/DLSS 映射和 Metal 4 偏好。
 - **兼容规则：** 每游戏独立的 DLL 加载规则和环境变量。Steam 游戏的启动参数仍在 Steam 游戏属性中设置，本地 EXE 参数由 Portlane 管理。
-- **输入与音频：** 手柄选项和空间音频诊断；设备管理在 **Mac 手柄** 页面中进行。
+- **输入与音频：** 手柄选项、空间音频运行时支持与逐游戏诊断；设备管理在 **Mac 手柄** 页面中进行。
 - **运行组件：** Wine 和图形组件的安装、导入、选择与检查，以及高级 Bottle 和本地目录工具。
 - **诊断：** 系统检查、Steam 启动衔接状态、启动错误与运行日志。
 

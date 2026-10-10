@@ -2,15 +2,32 @@
   <img src="Assets/PortlaneIcon.png" width="144" alt="Portlane icon">
   <h1>Portlane · 引航</h1>
   <p><strong>Windows Steam on your Mac, with compatibility settings for each game.</strong></p>
-  <p>Apple Silicon · SwiftUI / AppKit · Wine · D3DMetal</p>
+  <p>Object-based spatial audio · Validated 7.1.4 output · Apple Silicon · Wine · D3DMetal</p>
   <p>English · <a href="README.zh-CN.md">简体中文</a></p>
 </div>
 
 Portlane manages the Mac environment that runs Windows Steam games. Browse the store, install games, manage downloads, and press **Play** in the official Windows Steam client. Use Portlane to choose the graphics backend, adjust compatibility rules, configure controllers, and diagnose launch problems.
 
+**Spatial audio is a core Portlane feature.** Our runtime connects Windows game audio objects to native macOS rendering, preserving position and height information. The local 7.1.4 output path has been validated, and the user has confirmed working in-game Atmos rendering in **Black Myth: Wukong**.
+
 Keep Portlane open while playing. When **Steam Play relay connected** appears, supported Play requests from Steam's desktop interface apply the selected game's saved Mac configuration before launch.
 
 ![Portlane game configuration](docs/screenshots/portlane/game-configuration.jpg)
+
+## Core feature: Windows game spatial audio
+
+Portlane's spatial audio runtime supports static beds and dynamic audio objects submitted through **Windows Spatial Audio**, rendered by the **macOS CoreAudio Spatial Mixer**. Object positions stay synchronized with audio data, while native channel order and height-speaker labels are preserved. Games that supply object audio can use this spatial rendering path on a Mac.
+
+- **Multichannel output with height:** the local 7.1.4 endpoint path (12 channels at 48 kHz) has been validated, alongside 5.1.2 layout tests and stereo fallback.
+- **Real game checks:** the user confirmed working in-game Atmos rendering in **Black Myth: Wukong**. **Split Fiction** passed a short gameplay check with the spatial audio services runtime and 7.1.4 output, with normal graphics, controls, and sound.
+- **Runtime validation:** `11.0.9-services.1` completed 3,090 spatial audio checks on the 7.1.4 endpoint with zero failures or skips, retaining two existing todo results.
+- **Per-game diagnostics:** optional spatial audio logs expose endpoint, object-capacity, and rendering information.
+
+To use it, import and select a runtime containing the spatial audio patches under **Runtime components** (the currently validated build is `11.0.9-services.1`), configure the macOS output device, and enable spatial/Atmos audio in a supported game. The app's default older `11.0.2` runtime download does not yet include this support.
+
+Support covers Windows object audio rendered through CoreAudio. Games must submit spatial objects, and multichannel devices must expose the correct speaker layout. Dolby Atmos encoded bitstream passthrough and head tracking are not implemented; physical speaker direction, device changes, and long sessions still need further acceptance testing.
+
+The implementation originates from Switchyard Wine's spatial audio patches, adapted and validated for this project's runtime. See [implementation and provenance](docs/SPATIAL_AUDIO.md) and [validation results](docs/SPATIAL_AUDIO_VALIDATION.md).
 
 ## What each app handles
 
@@ -67,7 +84,7 @@ Save and exit your game before closing Portlane: quitting the manager also close
 
 - **Graphics and performance:** renderer, synchronization, virtual desktop and resolution, Apple Metal HUD, MetalFX/DLSS mapping, and Metal 4 preferences.
 - **Compatibility rules:** per-game DLL loading overrides and environment variables. Steam launch arguments remain in Steam's game properties; local EXE arguments are managed in Portlane.
-- **Input and audio:** controller options and spatial audio diagnostics, with device management in **Mac controllers**.
+- **Input and audio:** controller options, spatial audio runtime support, and per-game diagnostics, with device management in **Mac controllers**.
 - **Runtime components:** install, import, select, and inspect Wine and graphics components, plus advanced Bottle and directory tools.
 - **Diagnostics:** system checks, Steam Play relay connection, launch errors, and runtime logs.
 
