@@ -3,6 +3,24 @@ import IndieCore
 @testable import IndieRuntime
 
 final class SteamClientHandoffTests: XCTestCase {
+    func testWukongAllowsRequiredCLRBridgeAndInvalidatesDisabledSession() {
+        let environment = ["WINEDLLOVERRIDES": "d3d11,dxgi=n,b", "WINEMSYNC": "1"]
+        let regular = SteamCompatibilityManager.relayEnvironment(for: environment, appID: 2001120)
+        let wukong = SteamCompatibilityManager.relayEnvironment(for: environment, appID: 2358720)
+        XCTAssertEqual(regular["WINEDLLOVERRIDES"], "d3d11,dxgi=n,b;mscoree,mshtml=;winedbg.exe=d")
+        XCTAssertEqual(wukong["WINEDLLOVERRIDES"], "d3d11,dxgi=n,b;mscoree=b;mshtml=;winedbg.exe=d")
+        XCTAssertEqual(wukong["WINEMSYNC"], "1")
+        let bottleID = UUID()
+        let oldSession = SteamSessionDescriptor(bottleID: bottleID, runtimeID: "wine", environment: regular, virtualDesktop: nil)
+        let newSession = SteamSessionDescriptor(bottleID: bottleID, runtimeID: "wine", environment: wukong, virtualDesktop: nil)
+        var tracker = SteamSessionTracker()
+        tracker.didLaunch(oldSession, reused: false)
+        XCTAssertFalse(tracker.canReuse(newSession))
+        tracker.didLaunch(newSession, reused: false)
+        XCTAssertTrue(tracker.canReuse(newSession))
+        XCTAssertFalse(tracker.canReuse(oldSession))
+    }
+
     func testMappedFileAliasResolvesToSameInstallation() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("steam-client-alias-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

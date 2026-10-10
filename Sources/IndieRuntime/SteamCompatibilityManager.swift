@@ -84,7 +84,7 @@ public enum SteamCompatibilityManager {
     /// Steam must create recent game processes itself so SteamAPI and launch
     /// contracts are initialized correctly. Relay the selected renderer and
     /// Metal HUD to Steam; its child game then inherits the exact launch plan.
-    public static func relayEnvironment(for gameEnvironment: [String: String]) -> [String: String] {
+    public static func relayEnvironment(for gameEnvironment: [String: String], appID: UInt64? = nil) -> [String: String] {
         var environment = gameEnvironment
         // A reused Steam client launches more than one AppID. Steam injects
         // these values into each child itself; pinning either on the client
@@ -92,7 +92,13 @@ public enum SteamCompatibilityManager {
         environment.removeValue(forKey: "SteamAppId")
         environment.removeValue(forKey: "SteamGameId")
         environment["WINE_WAIT_CHILD_PIPE_IGNORE"] = "steam.exe"
-        let compatibility = "mscoree,mshtml=;winedbg.exe=d"
+        // Black Myth: Wukong imports mscoree.dll in its shipping executable.
+        // Disabling it on Steam also disables it in the child game, causing
+        // STATUS_DLL_NOT_FOUND before the game can initialize. Keep this
+        // exception in the launch environment, not the shared bottle registry.
+        let compatibility = appID == 2358720
+            ? "mscoree=b;mshtml=;winedbg.exe=d"
+            : "mscoree,mshtml=;winedbg.exe=d"
         if let overrides = environment["WINEDLLOVERRIDES"], !overrides.isEmpty {
             environment["WINEDLLOVERRIDES"] = overrides + ";" + compatibility
         } else {
@@ -122,7 +128,7 @@ public enum SteamCompatibilityManager {
         steamDirectory: URL? = nil
     ) throws -> SteamCompatibilityResult {
         guard fileManager.isReadableFile(atPath: wrapper.path) else {
-            throw IndieError.notFound(L("Mac Gaming Uncle 缺少 Steam 界面兼容组件，请重新构建应用"))
+            throw IndieError.notFound(L("Portlane 缺少 Steam 界面兼容组件，请重新构建应用"))
         }
         let steam = steamDirectory ?? steamRoot(in: bottle)
         let cef = steam.appendingPathComponent("bin/cef/cef.win64", isDirectory: true)

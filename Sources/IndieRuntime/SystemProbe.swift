@@ -56,7 +56,7 @@ public actor SystemProbe {
         items.append(.init(
             id: "architecture",
             title: "Apple Silicon",
-            detail: architecture == .arm64 ? chip : L("Mac Gaming Uncle 仅支持 Apple Silicon"),
+            detail: architecture == .arm64 ? chip : L("Portlane 仅支持 Apple Silicon"),
             severity: architecture == .arm64 ? .pass : .failure
         ))
         items.append(.init(

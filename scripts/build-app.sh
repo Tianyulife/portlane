@@ -3,7 +3,7 @@ set -euo pipefail
 
 project_root=${0:A:h:h}
 build_configuration=${MAC_GAMING_UNCLE_CONFIGURATION:-${INDIE_CONFIGURATION:-release}}
-app_destination=${MAC_GAMING_UNCLE_APP_DESTINATION:-"$project_root/dist/Mac Gaming Uncle.app"}
+app_destination=${MAC_GAMING_UNCLE_APP_DESTINATION:-"$project_root/dist/Portlane.app"}
 
 cd "$project_root"
 "$project_root/scripts/build-steam-wrapper.sh"
@@ -14,7 +14,7 @@ rm -rf "$app_destination"
 mkdir -p "$app_destination/Contents/MacOS" "$app_destination/Contents/Resources"
 ditto "$bin_dir/MacGamingUncleApp" "$app_destination/Contents/MacOS/MacGamingUncleApp"
 ditto "$project_root/Config/Info.plist" "$app_destination/Contents/Info.plist"
-ditto "$project_root/Assets/MacGamingUncle.icns" "$app_destination/Contents/Resources/MacGamingUncle.icns"
+ditto "$project_root/Assets/Portlane.icns" "$app_destination/Contents/Resources/Portlane.icns"
 for language in en zh-Hans; do
   mkdir -p "$app_destination/Contents/Resources/$language.lproj"
   ditto "$project_root/Config/$language.lproj/InfoPlist.strings" "$app_destination/Contents/Resources/$language.lproj/InfoPlist.strings"

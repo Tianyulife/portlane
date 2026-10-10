@@ -38,17 +38,12 @@ struct FrameInterpolationView: View {
             }
             DisclosureGroup(L("手动选择窗口（备用）")) {
               HStack {
-                Picker(L("游戏窗口"), selection: $selected) {
-                    Text(L("请选择正在显示的游戏窗口")).tag(UInt32(0))
-                    ForEach(service.windows, id: \.windowID) { window in
-                        Text("\(window.owningApplication?.applicationName ?? "") · \(window.title ?? "")").tag(window.windowID)
-                    }
-                }
+                SteamPicker(title: L("游戏窗口"), selection: $selected, choices: [(L("请选择正在显示的游戏窗口"), UInt32(0))] + service.windows.map { ("\($0.owningApplication?.applicationName ?? "") · \($0.title ?? "")", $0.windowID) })
                 Button(L("刷新窗口")) { Task { await service.refreshWindows() } }
             }
               HStack {
                 Button(L("启动 2× 插帧")) { Task { await service.start(windowID: selected) } }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(SteamButtonStyle(prominent: true))
                     .disabled(!enabled.wrappedValue || selected == 0 || service.active || !FrameInterpolationEngine.isSupported)
               }
             }
@@ -63,6 +58,7 @@ struct FrameInterpolationView: View {
         .padding(24)
       }
         .frame(minWidth: 600, minHeight: 480)
+        .steamSurface()
         .task { automatic.bind(model: model) }
     }
 }

@@ -38,6 +38,8 @@ public actor SteamDownloadBridge {
     private let steamDirectory: URL
     private var context: (directory: URL, session: String)?
     private var installing = false
+    private var launchContexts: [String: String] = [:]
+    private var launchDirectory: URL?
     public init(steamDirectory: URL) {
         self.steamDirectory = steamDirectory
         root = Self.mailboxRoot(steamDirectory: steamDirectory)
@@ -72,6 +74,71 @@ public actor SteamDownloadBridge {
         let value = try await evaluate("window.__mguDownloads.lease=Date.now();window.__mguDownloads.items")
         let data = try JSONSerialization.data(withJSONObject: value)
         return try JSONDecoder().decode([SteamBridgeDownload].self, from: data)
+    }
+
+    /// Lease the hook in each official desktop UI context, including the shared
+    /// library context. Reading a process log after launch would be too late.
+    public func takeGameLaunchRequests(appIDs: [UInt64]) async throws -> (active: Bool, appIDs: [UInt64]) {
+        let directory = try activeDirectory()
+        if launchDirectory != directory { launchContexts = [:]; launchDirectory = directory }
+        let targets = try await command("Target.getTargets", directory: directory)
+        let infos = (targets["targetInfos"] as? [[String: Any]] ?? []).filter {
+            let title = $0["title"] as? String ?? ""
+            let url = URL(string: $0["url"] as? String ?? "")
+            return title == "SharedJSContext" || title == "Steam" || url?.host == "steamloopback.host"
+        }
+        let live = Set(infos.compactMap { $0["targetId"] as? String })
+        launchContexts = launchContexts.filter { live.contains($0.key) }
+        var active = false
+        var requests = Set<UInt64>()
+        var failures: [String] = []
+        for info in infos {
+            guard let id = info["targetId"] as? String else { continue }
+            do {
+                if launchContexts[id] == nil {
+                    let attached = try await command("Target.attachToTarget", params: ["targetId": id, "flatten": true], directory: directory)
+                    launchContexts[id] = attached["sessionId"] as? String
+                }
+                guard let session = launchContexts[id] else { continue }
+                let result = try await command("Runtime.evaluate", params: [
+                    "expression": SteamLaunchRelay.script(appIDs: appIDs), "returnByValue": true
+                ], directory: directory, session: session)
+                if let exception = result["exceptionDetails"] as? [String: Any] {
+                    let description = (exception["exception"] as? [String: Any])?["description"] as? String
+                    failures.append(String((description ?? "Steam interface unavailable").prefix(240)))
+                    continue
+                }
+                guard let value = (result["result"] as? [String: Any])?["value"] as? [String: Any] else { continue }
+                active = active || value["active"] as? Bool == true
+                for number in value["appIDs"] as? [NSNumber] ?? [] {
+                    let appID = number.uint64Value
+                    if appIDs.contains(appID) { requests.insert(appID) }
+                }
+            } catch { launchContexts[id] = nil; failures.append(error.localizedDescription) }
+        }
+        if !active && !failures.isEmpty { throw IndieError.notFound(failures.joined(separator: "\n")) }
+        return (active, requests.sorted())
+    }
+
+    public func completeGameLaunchRequest(appID: UInt64) async {
+        guard let directory = launchDirectory else { return }
+        for session in launchContexts.values {
+            _ = try? await command("Runtime.evaluate", params: [
+                "expression": "window.__mguLaunchRelay?.complete(\(appID));true", "returnByValue": true
+            ], directory: directory, session: session)
+        }
+    }
+
+    /// The same official Play entry point used by Steam's desktop library.
+    /// Requires the native manager's live lease; never bypasses configuration.
+    public func requestConfiguredPlay(appID: UInt64) async throws {
+        guard appID > 0, appID <= UInt32.max else { throw IndieError.invalidArgument("Invalid Steam AppID") }
+        let accepted = try await evaluate("""
+        (()=>{const s=window.__mguLaunchRelay;
+        if(!s||Date.now()-s.lease>15000||!s.ids.has(\(appID))||SteamClient.Apps.RunGame!==s.wrapped)return false;
+        SteamClient.Apps.RunGame('\(appID)','',-1,0);return true;})()
+        """) as? Bool
+        guard accepted == true else { throw IndieError.notFound(L("Steam 启动衔接尚未连接")) }
     }
 
     /// The app must obtain explicit user confirmation before calling this operation.

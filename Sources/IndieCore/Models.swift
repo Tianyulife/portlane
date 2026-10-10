@@ -327,6 +327,8 @@ public struct GameConfiguration: Codable, Hashable, Sendable, Identifiable {
     public var controllerRumble: Bool
     public var frameInterpolation: Bool?
     public var spatialAudioDiagnostics: Bool?
+    public var dllOverrides: [String: DLLLoadOrder]?
+    public var environmentVariables: [String: String]?
     public var arguments: [String]
     public var updatedAt: Date
 
@@ -342,6 +344,8 @@ public struct GameConfiguration: Codable, Hashable, Sendable, Identifiable {
         controllerRumble: Bool = true,
         frameInterpolation: Bool? = nil,
         spatialAudioDiagnostics: Bool? = nil,
+        dllOverrides: [String: DLLLoadOrder]? = nil,
+        environmentVariables: [String: String]? = nil,
         arguments: [String] = [],
         updatedAt: Date = Date()
     ) {
@@ -356,6 +360,8 @@ public struct GameConfiguration: Codable, Hashable, Sendable, Identifiable {
         self.controllerRumble = controllerRumble
         self.frameInterpolation = frameInterpolation
         self.spatialAudioDiagnostics = spatialAudioDiagnostics
+        self.dllOverrides = dllOverrides
+        self.environmentVariables = environmentVariables
         self.arguments = arguments
         self.updatedAt = updatedAt
     }
@@ -367,7 +373,8 @@ public struct GameConfiguration: Codable, Hashable, Sendable, Identifiable {
         virtualDesktop != nil || preferredRenderer != nil || syncBackend != .automatic ||
             metalHUD != .inherit || metalFX != .inherit || metal4 != .inherit ||
             controllerMode != .automatic || !controllerRumble || frameInterpolation == true ||
-            spatialAudioDiagnostics == true || !arguments.isEmpty
+            spatialAudioDiagnostics == true || !(dllOverrides ?? [:]).isEmpty ||
+            !(environmentVariables ?? [:]).isEmpty || !arguments.isEmpty
     }
 }
 

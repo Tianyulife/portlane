@@ -200,7 +200,7 @@ struct SteamShellLibraryView: View {
             Spacer()
             Image(systemName: "books.vertical").font(.system(size: 42)).foregroundStyle(IndiePalette.primary)
             Text(L("登录 Steam 后，这里会显示你的游戏库")).font(.system(size: 20, weight: .semibold))
-            Text(L("Mac Gaming Uncle 从本机 Steam 缓存读取游戏与游玩记录，不上传账户数据。"))
+            Text(L("Portlane 从本机 Steam 缓存读取游戏与游玩记录，不上传账户数据。"))
                 .foregroundStyle(IndiePalette.secondaryText)
             Button(L("打开 Steam 登录"), systemImage: "person.crop.circle") { Task { await model.launchSteam() } }
                 .buttonStyle(.borderedProminent).controlSize(.large)

@@ -38,7 +38,7 @@ private struct ControllerManagementContent: View {
         VStack(alignment: .leading, spacing: 20) {
             HStack(alignment: .bottom) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(L("手柄中心")).font(.system(size: 34, weight: .bold, design: .rounded))
+                    Text(L("手柄中心")).font(.system(size: 24, weight: .medium))
                     Text(L("连接、检查并管理用于 Windows 游戏的控制器。"))
                         .foregroundStyle(IndiePalette.secondaryText)
                 }
@@ -52,7 +52,7 @@ private struct ControllerManagementContent: View {
                     Button(L("搜索蓝牙手柄"), systemImage: "dot.radiowaves.left.and.right") {
                         manager.startDiscovery()
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(SteamButtonStyle(prominent: true))
                 }
             }
 
@@ -80,8 +80,9 @@ private struct ControllerManagementContent: View {
                 .padding(.vertical, 2)
             }
         }
-        .padding(34)
-        .alert(L("手柄操作失败"), isPresented: Binding(
+        .padding(24)
+        .steamSurface()
+        .steamDialog(L("手柄操作失败"), isPresented: Binding(
             get: { manager.lastError != nil },
             set: { if !$0 { manager.lastError = nil } }
         )) {
@@ -101,17 +102,14 @@ private struct ControllerManagementContent: View {
                 Text(L("可在每个游戏中覆盖")).font(.caption).foregroundStyle(IndiePalette.secondaryText)
             }
             Divider().overlay(IndiePalette.border)
-            Picker(L("默认输入模式"), selection: $defaultMode) {
-                Text(L("自动（Wine / Steam Input）")).tag(ControllerMode.automatic.rawValue)
-                Text(L("增强兼容（SDL HIDAPI）")).tag(ControllerMode.enhanced.rawValue)
-            }
+            SteamPicker(title: L("默认输入模式"), selection: $defaultMode, choices: [(L("自动（Wine / Steam Input）"), ControllerMode.automatic.rawValue), (L("增强兼容（SDL HIDAPI）"), ControllerMode.enhanced.rawValue)])
             Toggle(L("默认启用震动"), isOn: $defaultRumble)
             Text(L("增强模式会为 PlayStation、Switch 和通用 HID 手柄启用 SDL 兼容路径；游戏已有独立设置时，以游戏设置为准。"))
                 .font(.caption).foregroundStyle(IndiePalette.secondaryText)
         }
         .padding(18)
-        .background(IndiePalette.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(IndiePalette.border))
+        .background(IndiePalette.panel, in: RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(IndiePalette.border))
     }
 
     private var emptyState: some View {
@@ -122,13 +120,13 @@ private struct ControllerManagementContent: View {
             Text(L("先让手柄进入配对模式，再点击“搜索蓝牙手柄”；有线手柄连接后会自动出现。"))
                 .multilineTextAlignment(.center).foregroundStyle(IndiePalette.secondaryText)
             HStack {
-                Button(L("搜索蓝牙手柄")) { manager.startDiscovery() }.buttonStyle(.borderedProminent)
+                Button(L("搜索蓝牙手柄")) { manager.startDiscovery() }.buttonStyle(SteamButtonStyle(prominent: true))
                 Button(L("打开系统设置")) { manager.openSystemControllerSettings() }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 230)
-        .background(IndiePalette.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(IndiePalette.border))
+        .background(IndiePalette.panel, in: RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(IndiePalette.border))
     }
 }
 
@@ -142,7 +140,7 @@ private struct ControllerDeviceCard: View {
                 Image(systemName: "gamecontroller.fill")
                     .font(.system(size: 24)).foregroundStyle(IndiePalette.primary)
                     .frame(width: 48, height: 48)
-                    .background(IndiePalette.surfaceStrong, in: RoundedRectangle(cornerRadius: 13))
+                    .background(IndiePalette.control, in: RoundedRectangle(cornerRadius: 3))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(device.name).font(.system(size: 17, weight: .semibold))
                     Text("\(device.category) · \(device.profile)")
@@ -156,16 +154,9 @@ private struct ControllerDeviceCard: View {
             Divider().overlay(IndiePalette.border)
 
             HStack(spacing: 24) {
-                Picker(L("玩家编号"), selection: Binding(
-                    get: { device.playerIndex },
-                    set: { manager.assignPlayer($0, to: device.id) }
-                )) {
-                    Text(L("未分配")).tag(-1)
-                    Text(L("玩家 1")).tag(0)
-                    Text(L("玩家 2")).tag(1)
-                    Text(L("玩家 3")).tag(2)
-                    Text(L("玩家 4")).tag(3)
-                }
+                SteamPicker(title: L("玩家编号"), selection: Binding(
+                    get: { device.playerIndex }, set: { manager.assignPlayer($0, to: device.id) }
+                ), choices: [(L("未分配"), -1), (L("玩家 1"), 0), (L("玩家 2"), 1), (L("玩家 3"), 2), (L("玩家 4"), 3)])
                 .frame(maxWidth: 240)
 
                 if let level = device.batteryLevel {
@@ -199,8 +190,8 @@ private struct ControllerDeviceCard: View {
             .background(Color.black.opacity(0.16), in: RoundedRectangle(cornerRadius: 10))
         }
         .padding(18)
-        .background(IndiePalette.surface, in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(IndiePalette.border))
+        .background(IndiePalette.panel, in: RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).stroke(IndiePalette.border))
     }
 
     private func batteryIcon(_ level: Double) -> String {

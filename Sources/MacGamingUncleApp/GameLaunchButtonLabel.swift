@@ -10,7 +10,7 @@ struct GameLaunchButtonLabel: View {
             } else if state == .running {
                 Image(systemName: "checkmark.circle.fill")
             } else {
-                UncleAppleMark(size: 24)
+                PortlaneMark(size: 24)
             }
             Text(title)
         }

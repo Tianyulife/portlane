@@ -2,9 +2,9 @@
 set -euo pipefail
 
 project_root=${0:A:h:h}
-app="$project_root/dist/Mac Gaming Uncle.app"
+app="$project_root/dist/Portlane.app"
 version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$project_root/Config/Info.plist")
-artifact="$project_root/dist/Mac-Gaming-Uncle-$version-macOS-arm64.dmg"
+artifact="$project_root/dist/Portlane-$version-macOS-arm64.dmg"
 checksum="$artifact.sha256"
 staging=$(mktemp -d "${TMPDIR:-/tmp}/mac-gaming-uncle-dmg.XXXXXX")
 mount_point=$(mktemp -d "${TMPDIR:-/tmp}/mac-gaming-uncle-mount.XXXXXX")
@@ -15,13 +15,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-"$project_root/scripts/build-app.sh"
-/usr/bin/ditto "$app" "$staging/Mac Gaming Uncle.app"
+if [[ ${PORTLANE_SKIP_APP_BUILD:-0} != 1 ]]; then
+  "$project_root/scripts/build-app.sh"
+fi
+/usr/bin/ditto "$app" "$staging/Portlane.app"
 /bin/ln -s /Applications "$staging/Applications"
 /bin/rm -f "$artifact" "$checksum"
 
 /usr/bin/hdiutil create \
-  -volname "Mac Gaming Uncle $version" \
+  -volname "Portlane $version" \
   -srcfolder "$staging" \
   -format UDZO \
   -imagekey zlib-level=9 \
@@ -30,15 +32,27 @@ trap cleanup EXIT
 /usr/bin/hdiutil verify "$artifact"
 
 /usr/bin/hdiutil attach -readonly -nobrowse -mountpoint "$mount_point" "$artifact" >/dev/null
-/usr/bin/codesign --verify --deep --strict "$mount_point/Mac Gaming Uncle.app"
+/usr/bin/codesign --verify --deep --strict "$mount_point/Portlane.app"
 /bin/test -L "$mount_point/Applications"
 for resource_name in MacGamingUncle_IndieCore.bundle MacGamingUncle_IndieCatalog.bundle MacGamingUncle_MacGamingUncleApp.bundle; do
-  /bin/test -d "$mount_point/Mac Gaming Uncle.app/Contents/Resources/$resource_name"
+  /bin/test -d "$mount_point/Portlane.app/Contents/Resources/$resource_name"
 done
-/bin/test -f "$mount_point/Mac Gaming Uncle.app/Contents/Resources/MacGamingUncle_IndieCatalog.bundle/grim-dawn.json"
-/bin/test -f "$mount_point/Mac Gaming Uncle.app/Contents/Resources/MacGamingUncle_MacGamingUncleApp.bundle/uncle-apple.png"
+resource_root() {
+  local resource_bundle="$1"
+  if [[ -d "$resource_bundle/Contents/Resources" ]]; then
+    print -r -- "$resource_bundle/Contents/Resources"
+  else
+    print -r -- "$resource_bundle"
+  fi
+}
+catalog_resources=$(resource_root "$mount_point/Portlane.app/Contents/Resources/MacGamingUncle_IndieCatalog.bundle")
+app_resources=$(resource_root "$mount_point/Portlane.app/Contents/Resources/MacGamingUncle_MacGamingUncleApp.bundle")
+core_resources=$(resource_root "$mount_point/Portlane.app/Contents/Resources/MacGamingUncle_IndieCore.bundle")
+/bin/test -f "$catalog_resources/grim-dawn.json"
+/bin/test -f "$app_resources/portlane-mark.png"
+/bin/test -f "$mount_point/Portlane.app/Contents/Resources/Portlane.icns"
 for app_language in en zh-Hans; do
-  /bin/test -f "$mount_point/Mac Gaming Uncle.app/Contents/Resources/MacGamingUncle_IndieCore.bundle/$app_language.lproj/Localizable.strings"
+  /bin/test -f "$core_resources/$app_language.lproj/Localizable.strings"
 done
 /usr/bin/hdiutil detach "$mount_point" >/dev/null
 

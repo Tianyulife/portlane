@@ -45,6 +45,12 @@ final class SteamSessionManager: ObservableObject {
 }
 
 extension LaunchPlan {
+    func withEnvironment(_ environment: [String: String]) -> LaunchPlan {
+        LaunchPlan(id: id, executable: executable, windowsExecutablePath: windowsExecutablePath,
+            bottle: bottle, runtimeID: runtimeID, renderer: renderer, arguments: arguments,
+            environment: environment, warnings: warnings, virtualDesktop: virtualDesktop, generatedAt: generatedAt)
+    }
+
     func withoutVirtualDesktop() -> LaunchPlan {
         LaunchPlan(
             id: id,

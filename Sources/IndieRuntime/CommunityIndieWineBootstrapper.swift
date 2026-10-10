@@ -33,7 +33,7 @@ public actor CommunityIndieWineBootstrapper {
         try paths.createDirectories()
         let sourceRoot = Self.runtimePayloadRoot(in: source)
         guard Self.isCompleteRuntime(sourceRoot) else {
-            throw IndieError.invalidData(L("本地 Mac Gaming Uncle Wine 11 构建不完整"))
+            throw IndieError.invalidData(L("本地 Portlane Wine 11 构建不完整"))
         }
         let sourceVersion = Self.runtimeVersion(in: sourceRoot) ?? Self.version
         if sourceVersion >= SemanticVersion(major: 11, minor: 0, patch: 2),
@@ -88,7 +88,7 @@ public actor CommunityIndieWineBootstrapper {
         manifest: RuntimeManifest? = nil
     ) throws -> LocalWineRuntime {
         guard Self.isCompleteRuntime(root) else {
-            throw IndieError.invalidData(L("Mac Gaming Uncle Wine 11 运行环境不完整"))
+            throw IndieError.invalidData(L("Portlane Wine 11 运行环境不完整"))
         }
         let installed = LocalWineRuntime(manifest: manifest ?? Self.manifest, root: root, importedAt: Date())
         try IndieJSON.encoder(pretty: true).encode(installed)
@@ -139,7 +139,7 @@ public actor CommunityIndieWineBootstrapper {
         guard version != Self.version else { return Self.manifest }
         return RuntimeManifest(
             id: runtimeID,
-            displayName: L("Mac Gaming Uncle Wine \(version) 手柄增强引擎"),
+            displayName: L("Portlane Wine \(version) 手柄增强引擎"),
             version: version,
             channel: .experimental,
             hostArchitecture: .x86_64,
@@ -153,7 +153,7 @@ public actor CommunityIndieWineBootstrapper {
 
     public static let manifest = RuntimeManifest(
         id: runtimeID,
-        displayName: L("Mac Gaming Uncle Wine 11 手柄增强游戏引擎"),
+        displayName: L("Portlane Wine 11 手柄增强游戏引擎"),
         version: version,
         channel: .experimental,
         hostArchitecture: .x86_64,

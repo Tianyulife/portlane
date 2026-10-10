@@ -218,7 +218,7 @@ struct FocusDeckHomeView: View {
                 Text(L("A 选择")).fontWeight(.semibold)
                 Text(L("B 返回")).fontWeight(.semibold)
             } else {
-                Text(model.status.isEmpty ? L("Mac Gaming Uncle 已就绪") : model.status)
+                Text(model.status.isEmpty ? L("Portlane 已就绪") : model.status)
             }
         }
         .font(.system(size: 12.5)).foregroundStyle(Color.white.opacity(0.65))

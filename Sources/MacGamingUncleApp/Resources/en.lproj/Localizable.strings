@@ -3,7 +3,7 @@
 "sidebar.runtimes" = "Runtimes";
 "sidebar.diagnostics" = "Diagnostics";
 "overview.title" = "Windows games, at home on Mac";
-"overview.subtitle" = "Mac Gaming Uncle orchestrates Wine, D3DMetal, and open Metal renderers without installing a Windows VM.";
+"overview.subtitle" = "Portlane orchestrates Wine, D3DMetal, and open Metal renderers without installing a Windows VM.";
 "overview.quickStart" = "Quick Start";
 "overview.step.runtime" = "Install a signed and verified Wine runtime";
 "overview.step.gptk" = "Automatically download and install GPTK graphics components";
@@ -13,7 +13,7 @@
 "status.notImported" = "Not imported";
 "action.refresh" = "Refresh";
 "action.ok" = "OK";
-"error.title" = "Mac Gaming Uncle couldn't complete the operation";
+"error.title" = "Portlane couldn't complete the operation";
 "library.title" = "Library";
 "library.scanSteam" = "Scan Steam";
 "library.installSteam" = "Install Steam";
@@ -27,7 +27,7 @@
 "runtime.gptk.detail" = "D3DMetal is Apple's DirectX 11/12 to Metal layer. The original GPTK image downloads through our separate R2 channel and is verified before import.";
 "runtime.downloadGPTK" = "Open Apple Download Page";
 "runtime.importGPTK" = "Import GPTK";
-"runtime.wine.detail" = "Mac Gaming Uncle builds Wine 11 from public corresponding source and does not bundle or redistribute commercial CrossOver binaries.";
+"runtime.wine.detail" = "Portlane builds Wine 11 from public corresponding source and does not bundle or redistribute commercial CrossOver binaries.";
 "runtime.importWine" = "Import local Wine";
 "runtime.importDXMT" = "Import DXMT";
 "runtime.importDXVK" = "Import DXVK";
@@ -35,7 +35,7 @@
 "diagnostics.title" = "System Diagnostics";
 "settings.channel" = "Update channel";
 "settings.metalHUD" = "Enable Metal HUD by default";
-"settings.privacy" = "Mac Gaming Uncle collects no telemetry. Compatibility recipes update from an auditable Git repository.";
+"settings.privacy" = "Portlane collects no telemetry. Compatibility recipes update from an auditable Git repository.";
 "音频诊断" = "Audio diagnostics";
 "记录空间音频诊断日志" = "Record spatial audio diagnostic logs";
 "用于确认游戏是否提交空间音频对象。日志会增加运行开销；短时测试结束后关闭，并重新启动游戏。" = "Confirm whether the game submits spatial audio objects. Logging adds overhead; turn it off after a short test and restart the game.";

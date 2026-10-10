@@ -42,7 +42,7 @@ struct SteamStorageView: View {
                                 Spacer()
                                 if selection == library.id { Image(systemName:"checkmark.circle.fill").foregroundStyle(.blue) }
                             }.padding(14).frame(maxWidth:.infinity,alignment:.leading)
-                                .background(RoundedRectangle(cornerRadius:10).fill(selection == library.id ? Color.blue.opacity(0.16) : Color.white.opacity(0.05)))
+                                .background(RoundedRectangle(cornerRadius:3).fill(selection == library.id ? IndiePalette.control : IndiePalette.panel))
                         }.buttonStyle(.plain)
                     }
                 }
@@ -65,6 +65,7 @@ struct SteamStorageView: View {
                 }
             }.disabled(model.isManagingSteamStorage)
         }.padding(24).frame(width:720,height:540)
+        .steamSurface().presentationBackground(IndiePalette.canvas)
             .onAppear {
                 model.refreshSteamLibraryLocations()
                 selection = model.preferredSteamLibraryID ?? model.steamLibraries.first?.id

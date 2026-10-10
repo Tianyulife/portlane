@@ -33,6 +33,41 @@ final class MacGamingUncleAppModel: ObservableObject {
     private var steamInstallSubmittedAt: [UInt64: Date] = [:]
     @Published var gameLaunchStates: [UInt64: GameLaunchState] = [:]
     private var gameLaunchMonitors: [UInt64: Task<Void, Never>] = [:]
+    @Published private(set) var steamLaunchRelayActive = false
+    @Published private(set) var steamLaunchRelayDetail = ""
+    private var steamLaunchRelayTask: Task<Void, Never>?
+    private var steamPlayRequestTask: Task<Void, Never>?
+    private var pendingSteamPlayRequests: [UInt64] = []
+
+    func startSteamLaunchRelay() {
+        guard steamLaunchRelayTask == nil else { return }
+        steamLaunchRelayTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self else { return }
+                if let bridge = self.downloadBridge(), !self.onboardingBusy {
+                    do {
+                        let snapshot = try await bridge.takeGameLaunchRequests(appIDs: (self.steamGames + self.steamDownloads).map(\.appID))
+                        self.steamLaunchRelayActive = snapshot.active
+                        self.steamLaunchRelayDetail = ""
+                        for appID in snapshot.appIDs where !self.pendingSteamPlayRequests.contains(appID) {
+                            self.pendingSteamPlayRequests.append(appID)
+                        }
+                        if self.steamPlayRequestTask == nil, !self.isWorking, !self.isOpeningSteamClient, let appID = self.pendingSteamPlayRequests.first {
+                            self.pendingSteamPlayRequests.removeFirst()
+                            self.steamPlayRequestTask = Task {
+                                defer { self.steamPlayRequestTask = nil }
+                                if let game = (self.steamGames + self.steamDownloads).first(where: { $0.appID == appID }) {
+                                    await self.launchSteamGame(game, fromSteamPlay: true)
+                                }
+                                await bridge.completeGameLaunchRequest(appID: appID)
+                            }
+                        }
+                    } catch { self.steamLaunchRelayActive = false; self.steamLaunchRelayDetail = error.localizedDescription }
+                } else { self.steamLaunchRelayActive = false }
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            }
+        }
+    }
     @Published var steamAccountGames: [SteamAccountGame] = []
     @Published var steamActivities: [UInt64: SteamGameActivity] = [:]
     @Published var steamStoreCatalog: SteamStoreCatalog?
@@ -113,7 +148,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             }
             guard self.wineRuntimes.contains(runtime),
                   runtime.manifest.id == CommunityIndieWineBootstrapper.runtimeID else {
-                throw IndieError.unsupported(L("游戏引擎只能选择 Mac Gaming Uncle Wine 版本"))
+                throw IndieError.unsupported(L("游戏引擎只能选择 Portlane Wine 版本"))
             }
             self.selectedWineRuntimeID = runtime.id
             UserDefaults.standard.set(runtime.id, forKey: "selectedWineRuntimeID")
@@ -184,6 +219,10 @@ final class MacGamingUncleAppModel: ObservableObject {
     var onboardingDXMTReady: Bool { rendererOverlays.contains { $0.kind == .dxmt } }
 
     func shutdownManagedSteam() async {
+        steamLaunchRelayTask?.cancel()
+        steamPlayRequestTask?.cancel()
+        await steamLaunchRelayTask?.value
+        await steamPlayRequestTask?.value
         for monitor in gameLaunchMonitors.values { monitor.cancel() }
         gameLaunchMonitors.removeAll()
         onboardingTask?.cancel()
@@ -223,7 +262,6 @@ final class MacGamingUncleAppModel: ObservableObject {
         onboardingError = nil
         defer { onboardingBusy = false }
         do {
-            onboardingStage = .environment
             guard let report = systemReport else {
                 throw IndieError.invalidData(lastError ?? L("无法读取系统信息，请重新打开应用"))
             }
@@ -231,6 +269,15 @@ final class MacGamingUncleAppModel: ObservableObject {
             guard failures.isEmpty else {
                 throw IndieError.unsupported(failures.map(\.detail).joined(separator: "；"))
             }
+            // Returning users stay in the main shell while checking. Do not
+            // flash a first-install screen before discovering a ready setup.
+            if report.rosettaInstalled, onboardingWineReady, onboardingDXMTReady,
+               onboardingGraphicsReady, steamExecutable != nil,
+               UserDefaults.standard.bool(forKey: "firstRunSteamLoginCompleted") {
+                onboardingStage = .complete
+                return
+            }
+            onboardingStage = .environment
             if !report.rosettaInstalled {
                 onboardingMessage = L("正在安装 Apple Rosetta 2…")
                 try await Subprocess().run(
@@ -264,6 +311,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             onboardingMessage = L("环境已就绪，正在准备 Steam…")
             try await prepareOnboardingSteam()
         } catch {
+            if onboardingStage == .checking { onboardingStage = .environment }
             onboardingError = error.localizedDescription
             lastError = nil
         }
@@ -381,13 +429,12 @@ final class MacGamingUncleAppModel: ObservableObject {
                 self.steamSessionManager.didStop()
             }
             status = L("准备就绪")
-            Task { await self.loadNativeSteamStore() }
         } catch { present(error) }
     }
 
     func handleDeepLink(_ url: URL) {
-        guard let scheme = url.scheme?.lowercased(), ["macgaminguncle", "indie"].contains(scheme) else {
-            present(IndieError.invalidArgument(L("无法识别 Mac Gaming Uncle 链接：\(url.absoluteString)")))
+        guard let scheme = url.scheme?.lowercased(), ["portlane", "macgaminguncle", "indie"].contains(scheme) else {
+            present(IndieError.invalidArgument(L("无法识别 Portlane 链接：\(url.absoluteString)")))
             return
         }
         if let destination = url.host?.lowercased(),
@@ -399,7 +446,7 @@ final class MacGamingUncleAppModel: ObservableObject {
               url.host?.lowercased() == "launch",
               let appIDText = url.pathComponents.dropFirst().first,
               let appID = UInt64(appIDText) else {
-            present(IndieError.invalidArgument(L("无法识别 Mac Gaming Uncle 链接：\(url.absoluteString)")))
+            present(IndieError.invalidArgument(L("无法识别 Portlane 链接：\(url.absoluteString)")))
             return
         }
         Task { @MainActor [weak self] in
@@ -414,11 +461,11 @@ final class MacGamingUncleAppModel: ObservableObject {
     }
 
     func prepareEnvironment() async {
-        await perform(L("正在安装 Mac Gaming Uncle Wine 11 开源运行环境…")) {
+        await perform(L("正在安装 Portlane Wine 11 开源运行环境…")) {
             guard self.systemReport?.isSupported == true else {
                 throw IndieError.unsupported(L("这台 Mac 尚未通过环境检查，请打开高级设置查看原因"))
             }
-            self.status = L("正在下载并校验 Mac Gaming Uncle Wine 11…")
+            self.status = L("正在下载并校验 Portlane Wine 11…")
             let installed = try await self.communityGamingWine.installLatest()
             self.wineRuntimes = await self.wineImporter.installed()
             self.status = L("游戏运行环境 \(installed.manifest.version) 已准备好")
@@ -447,7 +494,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     func installSteam() async {
         await perform(L("正在从 Valve 官方 CDN 下载 Steam…")) {
             guard let runtime = self.gamingWineRuntime else {
-                throw IndieError.notFound(L("请先准备 Mac Gaming Uncle Wine 11 开源运行环境"))
+                throw IndieError.notFound(L("请先准备 Portlane Wine 11 开源运行环境"))
             }
             let steamInstaller = SteamInstaller(paths: self.paths)
             let installer = try await steamInstaller.download()
@@ -491,17 +538,24 @@ final class MacGamingUncleAppModel: ObservableObject {
 
     func launchSteam(appID: UInt64? = nil) async {
         if let appID {
-            await sendSteamURI("steam://rungameid/\(appID)", status: L("正在通过 Steam 启动游戏…"))
+            if let game = steamGames.first(where: { $0.appID == appID }) {
+                await launchSteamGame(game)
+            } else { await openSteamClient(.game(appID)) }
         } else {
             await openSteamClient()
         }
     }
 
-    func launchSteamGame(_ game: SteamGame) async {
+    func openSteamGameProperties(appID: UInt64) async {
+        guard appID > 0, appID <= UInt32.max else { return }
+        await sendSteamURI("steam://gameproperties/\(appID)", status: L("正在打开 Steam 游戏属性…"))
+    }
+
+    func launchSteamGame(_ game: SteamGame, fromSteamPlay: Bool = false) async {
         guard !isWorking, gameLaunchStates[game.appID]?.blocksLaunch != true else { return }
         gameLaunchStates[game.appID] = .preparing
         await perform(L("正在为 \(game.name) 选择最佳图形后端…")) {
-            guard SteamDownloadBridge.permitsPlay(
+            guard fromSteamPlay || SteamDownloadBridge.permitsPlay(
                 manifestReady: (try? SteamScanner.refreshed(game).isReadyToPlay) == true,
                 download: self.steamBridgeDownloads[game.appID]) else {
                 try await self.scanDefaultSteamLibrary()
@@ -511,7 +565,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                 throw IndieError.notFound(L("尚未完成 Steam 安装"))
             }
             guard let gamingRuntime = self.gamingWineRuntime else {
-                throw IndieError.notFound(L("需要 Mac Gaming Uncle Wine 11 游戏引擎，请重新运行环境准备"))
+                throw IndieError.notFound(L("需要 Portlane Wine 11 游戏引擎，请重新运行环境准备"))
             }
             let gamingProvider = WineRuntimeProvider(manifest: gamingRuntime.manifest, root: gamingRuntime.root)
             let executable = try SteamExecutableResolver.shippingExecutable(for: game)
@@ -685,16 +739,18 @@ final class MacGamingUncleAppModel: ObservableObject {
                     launchOption: recipeProfile?.steamLaunchOption,
                     silent: true
                 ),
-                environment: SteamCompatibilityManager.relayEnvironment(for: gamePlan.environment),
+                environment: SteamCompatibilityManager.relayEnvironment(for: gamePlan.environment, appID: game.appID),
                 metalHUD: false,
                 virtualDesktop: configuration.virtualDesktop
             )
-            let steamPlan = try LaunchPlanBuilder.build(
+            let baseSteamPlan = try LaunchPlanBuilder.build(
                 executable: steam,
                 windowsExecutablePath: try WinePath.windowsPath(for: steam, in: bottle),
                 bottle: bottle, profile: steamProfile, analysis: steamAnalysis,
                 recipe: nil, installed: InstalledRenderers(available: [.wineD3D])
             )
+            let steamPlan = baseSteamPlan.withEnvironment(
+                try GameCompatibilityEnvironment.applying(configuration, to: baseSteamPlan.environment))
             let descriptor = SteamSessionDescriptor(
                 bottleID: bottle.id,
                 runtimeID: gamingRuntime.manifest.id,
@@ -705,6 +761,15 @@ final class MacGamingUncleAppModel: ObservableObject {
             let reusingSteam = self.steamSessionManager.canReuse(descriptor) &&
                 SteamCompatibilityManager.isLoggedOn(in: bottle)
             if !reusingSteam {
+                let downloads: [SteamBridgeDownload]
+                if SteamCompatibilityManager.isLoggedOn(in: bottle), let bridge = self.downloadBridge() {
+                    // Fail closed if a live client's download state cannot be
+                    // checked before restarting its shared environment.
+                    downloads = try await bridge.downloads()
+                } else { downloads = [] }
+                guard !downloads.contains(where: { !$0.completed && !$0.paused }) else {
+                    throw IndieError.invalidArgument(L("此游戏需要切换 Steam 运行环境，请先暂停 Steam 下载再启动"))
+                }
                 // A DPI/topology change requires stopping the shared prefix.
                 // Never silently interrupt another game, including one opened in Steam.
                 for installedGame in self.steamGames {
@@ -728,7 +793,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                 await gamingProvider.stopBottle(bottle)
                 try await gamingProvider.configureControllerSupport(in: bottle)
                 guard let wrapper = SteamCompatibilityManager.bundledWrapperURL() else {
-                    throw IndieError.notFound(L("Mac Gaming Uncle 缺少 Steam 界面兼容组件，请重新安装应用"))
+                    throw IndieError.notFound(L("Portlane 缺少 Steam 界面兼容组件，请重新安装应用"))
                 }
                 _ = try SteamCompatibilityManager.prepare(bottle: bottle, wrapper: wrapper)
                 if resolution.renderer == .d3dMetal,
@@ -964,12 +1029,7 @@ final class MacGamingUncleAppModel: ObservableObject {
 
     func chooseSteamLibraryFolder() async {
         guard !isWorking, !isManagingSteamStorage, !submittingSteamInstall else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = L("挂载游戏库")
-        panel.message = L("选择新建的游戏库文件夹，或已有 SteamLibrary／steamapps 文件夹。不会移动或删除游戏文件。")
-        guard panel.runModal() == .OK, var root = panel.url else { return }
+        guard var root = SteamFileDialog.choose(title: L("挂载游戏库"), directories: true, createDirectories: true) else { return }
         if root.lastPathComponent.lowercased() == "steamapps" { root.deleteLastPathComponent() }
         root = root.standardizedFileURL.resolvingSymlinksInPath()
         let volumeRoot = (try? root.resourceValues(forKeys:[.volumeURLKey]))?.volume
@@ -1180,7 +1240,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     func play(_ game: GameRecord) async {
         await perform(L("正在准备 \(game.displayName)…")) {
             guard let runtime = self.gamingWineRuntime else {
-                throw IndieError.notFound(L("请先准备 Mac Gaming Uncle Wine 11 开源运行环境"))
+                throw IndieError.notFound(L("请先准备 Portlane Wine 11 开源运行环境"))
             }
             let provider = WineRuntimeProvider(manifest: runtime.manifest, root: runtime.root)
             let bottle: BottleRecord
@@ -1265,11 +1325,12 @@ final class MacGamingUncleAppModel: ObservableObject {
                 metalHUD: metalHUD,
                 virtualDesktop: configuration.virtualDesktop
             )
-            let plan = try LaunchPlanBuilder.build(
+            let basePlan = try LaunchPlanBuilder.build(
                 executable: game.executableURL, bottle: bottle, profile: profile,
                 analysis: game.analysis, recipe: recipe,
                 installed: InstalledRenderers(available: rendererSet, overlayPaths: overlays)
             )
+            let plan = basePlan.withEnvironment(try GameCompatibilityEnvironment.applying(configuration, to: basePlan.environment))
             try self.paths.createDirectories()
             let log = self.paths.logs.appendingPathComponent("\(plan.id.uuidString).log")
             self.status = L("正在运行 \(game.displayName)…")
@@ -1303,6 +1364,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     func saveGameConfiguration(_ configuration: GameConfiguration) async {
         lastError = nil
         do {
+            try GameCompatibilityEnvironment.validate(configuration)
             guard configuration.virtualDesktop?.isValid != false else {
                 throw IndieError.invalidArgument(L("分辨率必须在 640×480 到 7680×4320 之间"))
             }
@@ -1341,7 +1403,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             guard component.rendererRoot != nil else {
                 throw IndieError.invalidData(L("GPTK 4 镜像缺少 D3DMetal Wine Bridge；请确认下载的是 Windows 游戏评估环境"))
             }
-            self.status = L("正在安装支持现代 Steam 的 Mac Gaming Uncle Wine 11（约 50 MB）…")
+            self.status = L("正在安装支持现代 Steam 的 Portlane Wine 11（约 50 MB）…")
             _ = try await self.communityGamingWine.installLatest()
             self.wineRuntimes = await self.wineImporter.installed()
             self.status = L("GPTK \(component.version) 已验证并安装，可以启动游戏")
@@ -1395,7 +1457,8 @@ final class MacGamingUncleAppModel: ObservableObject {
         if steamAccountGames != accountGames { steamAccountGames = accountGames }
         if steamActivities != snapshot.activities { steamActivities = snapshot.activities }
         if steamLibraries != snapshot.libraries { steamLibraries = snapshot.libraries }
-        scheduleSteamMetadataHydration()
+        // The official Steam library owns artwork and account browsing. The
+        // Mac configuration selector needs only locally installed game names.
     }
 
     func syncSteamLibrary() async {

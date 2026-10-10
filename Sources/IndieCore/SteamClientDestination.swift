@@ -4,6 +4,7 @@ import Foundation
 public enum SteamClientDestination: Equatable, Sendable {
     case library
     case downloads
+    case storeFront
     case game(UInt64)
     case store(UInt64)
 
@@ -11,6 +12,7 @@ public enum SteamClientDestination: Equatable, Sendable {
         switch self {
         case .library: "steam://open/main"
         case .downloads: "steam://nav/downloads"
+        case .storeFront: "steam://store"
         case .game(let id): "steam://nav/games/details/\(id)"
         case .store(let id): "steam://store/\(id)"
         }

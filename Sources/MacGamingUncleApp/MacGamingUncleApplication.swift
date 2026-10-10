@@ -8,7 +8,7 @@ struct MacGamingUncleApplication: App {
     @StateObject private var model = MacGamingUncleAppModel()
 
     var body: some Scene {
-        Window("Mac Gaming Uncle", id: "steam-shell-main") {
+        Window("Portlane", id: "steam-shell-main") {
             ContentView()
                 .environmentObject(model)
                 .environment(\.locale, AppLanguage.locale)
@@ -29,7 +29,7 @@ struct MacGamingUncleApplication: App {
             SettingsView()
                 .environmentObject(model)
                 .environment(\.locale, AppLanguage.locale)
-                .frame(width: 560, height: 360)
+                .frame(width: 620, height: 560)
         }
         WindowGroup(L("通用插帧（实验）"), id: "frame-interpolation", for: String.self) { id in
             if #available(macOS 26, *) {

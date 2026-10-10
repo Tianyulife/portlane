@@ -52,6 +52,16 @@ struct GameSettingsView: View {
     @Environment(\.openWindow) private var openWindow
     let target: GameSettingsTarget
 
+    let embedded: Bool
+    @Binding private var hasUnsavedChanges: Bool
+    @State private var category = 0
+    @State private var environmentLines: String
+    @State private var dllRows: [DLLSettingRow]
+    @State private var isSaving = false
+    @State private var saved = false
+
+    private var steamAppID: UInt64? { target.id.hasPrefix("steam:") ? UInt64(target.id.dropFirst(6)) : nil }
+
     @State private var configuration: GameConfiguration
     @State private var useVirtualDesktop: Bool
     @State private var width: String
@@ -59,8 +69,12 @@ struct GameSettingsView: View {
     @State private var renderer: RendererChoice
     @State private var argumentLines: String
 
-    init(target: GameSettingsTarget) {
+    init(target: GameSettingsTarget, embedded: Bool = false, hasUnsavedChanges: Binding<Bool> = .constant(false)) {
         self.target = target
+        self.embedded = embedded
+        _hasUnsavedChanges = hasUnsavedChanges
+        _environmentLines = State(initialValue: (target.configuration.environmentVariables ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: "\n"))
+        _dllRows = State(initialValue: (target.configuration.dllOverrides ?? [:]).sorted { $0.key < $1.key }.map { DLLSettingRow(name: $0.key, order: $0.value) })
         let resolution = target.configuration.virtualDesktop
         _configuration = State(initialValue: target.configuration)
         _useVirtualDesktop = State(initialValue: resolution != nil)
@@ -74,26 +88,35 @@ struct GameSettingsView: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(target.name).font(.system(size: 24, weight: .bold, design: .rounded))
-                    Text(L("独立游戏设置 · \(target.detail)")).font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text(target.name).font(.system(size: 20, weight: .medium))
+                    Text(target.detail).font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(L("恢复默认")) { reset() }
-                Button(L("取消")) { dismiss() }
-                Button(L("保存")) { save() }.buttonStyle(.borderedProminent).keyboardShortcut(.defaultAction)
+                Button(L("恢复推荐")) { reset() }.disabled(isSaving)
+                if !embedded { Button(L("取消")) { dismiss() }.disabled(isSaving) }
+                Button(L("保存")) { save() }.buttonStyle(SteamButtonStyle(prominent: true)).keyboardShortcut(.defaultAction).disabled(isSaving)
+
             }
             .padding(24)
             Divider()
 
-            Form {
-                Section(L("通用插帧（实验）")) {
+            HStack(spacing: 24) {
+                categoryButton(L("图形与性能"), value: 0)
+                categoryButton(L("兼容规则"), value: 1)
+                categoryButton(L("输入与音频"), value: 2)
+                Spacer()
+            }.padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 12)
+            ScrollView {
+              VStack(alignment: .leading, spacing: 14) {
+                if category == 0 {
+                SteamSettingsSection(title: L("通用插帧（实验）")) {
                     Button(L("打开插帧面板")) {
                         openWindow(id: "frame-interpolation", value: target.id)
                     }
                     Text(L("无需游戏支持 DLSS。开启一次后自动跟随游戏窗口，默认关闭；不改变分辨率或鼠标坐标。需要 macOS 26。"))
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                Section(L("显示")) {
+                SteamSettingsSection(title: L("显示")) {
                     Toggle(L("使用 Wine 虚拟桌面"), isOn: $useVirtualDesktop)
                     Text(L("为这个游戏创建固定尺寸的 Windows 桌面，可避免 Retina 缩放导致的画面拉伸和鼠标错位。"))
                         .font(.caption).foregroundStyle(.secondary)
@@ -103,36 +126,61 @@ struct GameSettingsView: View {
                         TextField(L("高度"), text: $height).frame(width: 100)
                         Text(L("像素")).foregroundStyle(.secondary)
                         Spacer()
-                        Menu(L("常用分辨率")) {
-                            resolutionButton(1280, 720)
-                            resolutionButton(1600, 900)
-                            resolutionButton(1920, 1080)
-                            resolutionButton(2560, 1440)
-                            resolutionButton(3840, 2160)
-                        }
+                        SteamActionMenu(title: L("常用分辨率"), actions: [(1280, 720), (1600, 900), (1920, 1080), (2560, 1440), (3840, 2160)].map { w, h in
+                            .init(title: "\(w) × \(h)", action: { width = String(w); height = String(h) })
+                        })
                     }
                     .disabled(!useVirtualDesktop)
                 }
 
-                Section(L("图形")) {
-                    Picker(L("渲染后端"), selection: $renderer) {
-                        ForEach(rendererChoices) { choice in Text(choice.label).tag(choice) }
-                    }
-                    Picker(L("同步方式"), selection: $configuration.syncBackend) {
-                        Text(L("自动（推荐）")).tag(SyncBackend.automatic)
-                        Text("MSync").tag(SyncBackend.msync)
-                        Text("Wine Server").tag(SyncBackend.wineserver)
-                    }
+                SteamSettingsSection(title: L("图形")) {
+                    SteamPicker(title: L("渲染后端"), selection: $renderer, choices: rendererChoices.map { ($0.label, $0) })
+                    SteamPicker(title: L("同步方式"), selection: $configuration.syncBackend, choices: [(L("自动（推荐）"), .automatic), ("MSync", .msync), ("Wine Server", .wineserver)])
                     overridePicker("Apple Metal HUD", selection: $configuration.metalHUD)
                     overridePicker("MetalFX / DLSS", selection: $configuration.metalFX)
                     overridePicker("Metal 4", selection: $configuration.metal4)
                 }
 
-                Section(L("手柄")) {
-                    Picker(L("输入模式"), selection: $configuration.controllerMode) {
-                        Text(L("自动（Wine / Steam Input）")).tag(ControllerMode.automatic)
-                        Text(L("增强兼容（SDL HIDAPI）")).tag(ControllerMode.enhanced)
+                }
+                if category == 1 {
+                    SteamSettingsSection(title: L("DLL 加载规则")) {
+                        if steamAppID == 2358720 {
+                            HStack { Text("mscoree").font(.system(.body, design: .monospaced)); Spacer(); Text(L("推荐：Wine 内置")).foregroundStyle(IndiePalette.green) }
+                            Text(L("黑神话：悟空需要此 DLL。恢复推荐会保留已验证的内置兼容规则。"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        } else { Text(L("未覆盖的 DLL 使用渲染组件与内置兼容规则。")).font(.caption).foregroundStyle(.secondary) }
+                        ForEach($dllRows) { $row in
+                            HStack {
+                                TextField(L("DLL 名称"), text: $row.name).frame(maxWidth: 220)
+                                SteamPicker(title: L("加载方式"), selection: $row.order, choices: [(L("Wine 内置"), .builtin), (L("原生优先"), .nativeFirst), (L("内置优先"), .builtinFirst), (L("禁用"), .disabled)])
+                                Button(L("移除"), systemImage: "minus.circle") { dllRows.removeAll { $0.id == row.id } }.labelStyle(.iconOnly)
+                            }
+                        }
+                        Button(L("添加 DLL 覆盖"), systemImage: "plus") { dllRows.append(DLLSettingRow()) }
                     }
+                    SteamSettingsSection {
+                        DisclosureGroup(L("高级：自定义环境变量")) {
+                            TextEditor(text: $environmentLines).scrollContentBackground(.hidden).padding(8).background(IndiePalette.control).font(.system(.body, design: .monospaced)).frame(minHeight: 90)
+                            Text(L("每行 NAME=VALUE；仅作用于当前游戏。Bottle 路径和 Steam 游戏身份由管理器保留。"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let appID = steamAppID {
+                        SteamSettingsSection(title: L("游戏启动参数")) {
+                            Button(L("打开 Steam 游戏属性"), systemImage: "arrow.up.forward.app") { Task { await model.openSteamGameProperties(appID: appID) } }
+                            Text(L("启动参数由官方 Steam 管理。Mac 兼容设置在启动前自动应用。"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    } else {
+                        SteamSettingsSection(title: L("启动参数")) {
+                            TextEditor(text: $argumentLines).scrollContentBackground(.hidden).padding(8).background(IndiePalette.control).font(.system(.body, design: .monospaced)).frame(minHeight: 70)
+                            Text(L("每行一个参数；仅应用于这个游戏。")).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                if category == 2 {
+                SteamSettingsSection(title: L("手柄")) {
+                    SteamPicker(title: L("输入模式"), selection: $configuration.controllerMode, choices: [(L("自动（Wine / Steam Input）"), .automatic), (L("增强兼容（SDL HIDAPI）"), .enhanced)])
                     Toggle(L("启用手柄震动"), isOn: $configuration.controllerRumble)
                         .disabled(configuration.controllerMode != .enhanced)
                     ControllerConnectionSummary(manager: model.controllerManager)
@@ -140,7 +188,7 @@ struct GameSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
-                Section(L("音频诊断")) {
+                SteamSettingsSection(title: L("音频诊断")) {
                     Toggle(L("记录空间音频诊断日志"), isOn: Binding(
                         get: { configuration.spatialAudioDiagnostics == true },
                         set: { configuration.spatialAudioDiagnostics = $0 ? true : nil }
@@ -149,19 +197,43 @@ struct GameSettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
 
-                Section(L("启动参数")) {
-                    TextEditor(text: $argumentLines).font(.system(.body, design: .monospaced)).frame(minHeight: 70)
-                    Text(L("每行一个参数；仅应用于这个游戏。"))
-                        .font(.caption).foregroundStyle(.secondary)
+                if let appID = steamAppID {
+                    SteamSettingsSection(title: L("Steam Input")) {
+                        Button(L("在 Steam 中管理按键映射"), systemImage: "arrow.up.forward.app") { Task { await model.openSteamGameProperties(appID: appID) } }
+                    }
+                }
                 }
             }
-            .formStyle(.grouped)
+              .padding(.horizontal, 24).padding(.bottom, 20)
+            }
+            if embedded {
+                HStack { Text(saved && !hasUnsavedChanges ? L("已保存 · 下次启动生效") : hasUnsavedChanges ? L("有未保存的修改") : L("设置仅作用于当前游戏 · 下次启动生效")); Spacer() }
+                    .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 24).padding(.vertical, 12)
+            }
         }
-        .frame(minWidth: 660, minHeight: 680)
-        .preferredColorScheme(.dark)
+        .frame(minWidth: embedded ? 0 : 660, minHeight: embedded ? 0 : 680)
+        .steamSurface()
+        .onChange(of: configuration) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: renderer) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: useVirtualDesktop) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: width) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: height) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: argumentLines) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: environmentLines) { _, _ in hasUnsavedChanges = true; saved = false }
+        .onChange(of: dllRows) { _, _ in hasUnsavedChanges = true; saved = false }
         .onChange(of: model.gameConfigurations[target.id]?.frameInterpolation) { _, value in
             configuration.frameInterpolation = value
         }
+    }
+
+    private func categoryButton(_ title: String, value: Int) -> some View {
+        Button { category = value } label: {
+            VStack(spacing: 10) {
+                Text(title).font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(category == value ? IndiePalette.blue : IndiePalette.secondaryText)
+                Rectangle().fill(category == value ? IndiePalette.blue : .clear).frame(height: 2)
+            }.fixedSize(horizontal: true, vertical: false)
+        }.buttonStyle(.plain)
     }
 
     private var rendererChoices: [RendererChoice] {
@@ -173,37 +245,40 @@ struct GameSettingsView: View {
 
     @ViewBuilder
     private func overridePicker(_ title: String, selection: Binding<GameSettingOverride>) -> some View {
-        Picker(title, selection: selection) {
-            Text(L("跟随全局设置")).tag(GameSettingOverride.inherit)
-            Text(L("开启")).tag(GameSettingOverride.enabled)
-            Text(L("关闭")).tag(GameSettingOverride.disabled)
-        }
-    }
-
-    private func resolutionButton(_ width: Int, _ height: Int) -> some View {
-        Button("\(width) × \(height)") {
-            self.width = String(width)
-            self.height = String(height)
-        }
+        SteamPicker(title: title, selection: selection, choices: [(L("跟随全局设置"), .inherit), (L("开启"), .enabled), (L("关闭"), .disabled)])
     }
 
     private func save() {
-        if useVirtualDesktop {
-            configuration.virtualDesktop = GameResolution(
-                width: Int(width) ?? 0,
-                height: Int(height) ?? 0
-            )
-        } else {
-            configuration.virtualDesktop = nil
+        var draft = configuration
+        draft.virtualDesktop = useVirtualDesktop ? GameResolution(width: Int(width) ?? 0, height: Int(height) ?? 0) : nil
+        draft.preferredRenderer = renderer.renderer
+        if steamAppID == nil {
+            draft.arguments = argumentLines.split(whereSeparator: \Character.isNewline)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
         }
-        configuration.preferredRenderer = renderer.renderer
-        configuration.arguments = argumentLines
-            .split(whereSeparator: \Character.isNewline)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        var overrides: [String: DLLLoadOrder] = [:]
+        for row in dllRows where !row.name.trimmingCharacters(in: .whitespaces).isEmpty {
+            let name = row.name.trimmingCharacters(in: .whitespaces).lowercased()
+            guard overrides[name] == nil else { model.lastError = L("DLL 名称不能重复：\(name)"); return }
+            overrides[name] = row.order
+        }
+        var variables: [String: String] = [:]
+        for line in environmentLines.split(whereSeparator: \Character.isNewline) {
+            guard let equals = line.firstIndex(of: "=") else { model.lastError = L("环境变量需要使用 NAME=VALUE 格式"); return }
+            let name = line[..<equals].trimmingCharacters(in: .whitespaces)
+            guard variables[name] == nil else { model.lastError = L("环境变量名称不能重复：\(name)"); return }
+            variables[name] = String(line[line.index(after: equals)...])
+        }
+        draft.dllOverrides = overrides.isEmpty ? nil : overrides
+        draft.environmentVariables = variables.isEmpty ? nil : variables
+        isSaving = true
         Task {
-            await model.saveGameConfiguration(configuration)
-            if model.lastError == nil { dismiss() }
+            await model.saveGameConfiguration(draft)
+            isSaving = false
+            if model.lastError == nil {
+                hasUnsavedChanges = false; saved = true
+                if !embedded { dismiss() }
+            }
         }
     }
 
@@ -214,5 +289,13 @@ struct GameSettingsView: View {
         height = "1080"
         renderer = .automatic
         argumentLines = ""
+        dllRows = []
+        environmentLines = ""
     }
+}
+
+private struct DLLSettingRow: Identifiable, Equatable {
+    let id = UUID()
+    var name = ""
+    var order = DLLLoadOrder.builtin
 }
