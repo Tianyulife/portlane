@@ -49,7 +49,13 @@ Portlane's workspace has three main pages: **Game configuration**, **Runtime com
 - Your own Steam account and licensed games.
 - Xcode 26 with a compatible Swift 6 toolchain to build the app. Features using macOS 26 APIs need SDK 26 or later to compile.
 
-This repository currently provides source code. A Portlane installer has not been published here; the previous project's release links are not Portlane downloads.
+Download the [Portlane 0.5.0 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/Portlane-0.5.0-macOS-arm64.dmg) and [spatial audio Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz). All assets and SHA-256 files are on the [Release page](https://github.com/Tianyulife/portlane/releases/tag/v0.5.0).
+
+1. Open the DMG, drag **Portlane** to **Applications**, then open it from that folder.
+2. Extract the Wine `.tar.xz` to obtain the `wine-runtime` folder.
+3. Under **Runtime components → Import local Wine**, select that folder, then select `11.0.9-services.1` as the active runtime.
+
+This is an ad-hoc signed research preview and is not notarized. Spatial audio Wine is a separate Release asset; the app's default runtime download remains the older `11.0.2`. Import the supplied runtime to enable spatial audio.
 
 ### Build and open
 

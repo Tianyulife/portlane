@@ -49,7 +49,13 @@ Portlane 的空间音频运行时支持游戏通过 **Windows Spatial Audio** �
 - 自己的 Steam 账户与合法拥有的游戏。
 - 从源码构建需要 Xcode 26 和兼容的 Swift 6 工具链。涉及 macOS 26 API 的功能需要 SDK 26 或更高版本才能编译。
 
-新仓库当前提供源码，尚未发布 Portlane 安装包。原项目的旧版本下载链接不能作为 Portlane 下载入口。
+下载 [Portlane 0.5.0 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/Portlane-0.5.0-macOS-arm64.dmg) 和 [空间音频 Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.0/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz)。完整资源与 SHA-256 校验文件见 [Release 页面](https://github.com/Tianyulife/portlane/releases/tag/v0.5.0)。
+
+1. 打开 DMG，将 **Portlane** 拖到 **Applications（应用程序）**，再从应用程序目录打开。
+2. 解压 Wine 的 `.tar.xz`，得到 `wine-runtime` 文件夹。
+3. 在 **运行组件 → 导入本地 Wine** 中选择该文件夹，再选择 `11.0.9-services.1` 作为活动运行时。
+
+安装包是尚未公证的 ad-hoc 签名研究预览版。空间音频 Wine 随 Release 单独提供，应用默认下载仍为旧 `11.0.2`；启用空间音频请按上述步骤导入。
 
 ### 编译并打开
 
