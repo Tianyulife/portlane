@@ -17,6 +17,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     @Published private(set) var isManagingSteamStorage = false
     @Published private(set) var steamStorageError: String?
     var preferredSteamLibraryID: String? { UserDefaults.standard.string(forKey:"preferredSteamLibraryID") }
+    private var didAutomaticallyOpenSteam = false
     @Published private(set) var isOpeningSteamClient = false
     @Published var steamClientNotice: String?
     @Published var steamInstallationRequests: [UInt64: SteamInstallationRequestState] = [:]
@@ -276,6 +277,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                onboardingGraphicsReady, steamExecutable != nil,
                UserDefaults.standard.bool(forKey: "firstRunSteamLoginCompleted") {
                 onboardingStage = .complete
+                await automaticallyOpenSteam()
                 return
             }
             onboardingStage = .environment
@@ -306,6 +308,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             if steamExecutable != nil,
                UserDefaults.standard.bool(forKey: "firstRunSteamLoginCompleted") {
                 onboardingStage = .complete
+                await automaticallyOpenSteam()
                 return
             }
             onboardingStage = .steam
@@ -316,6 +319,15 @@ final class MacGamingUncleAppModel: ObservableObject {
             onboardingError = error.localizedDescription
             lastError = nil
         }
+    }
+
+    private func automaticallyOpenSteam() async {
+        guard !didAutomaticallyOpenSteam, !Task.isCancelled else { return }
+        didAutomaticallyOpenSteam = true
+        // The first-install login flow already opens Steam itself. Returning
+        // users use the normal client path, which reuses a live session safely.
+        guard !isOpeningSteamClient else { return }
+        await openSteamClient()
     }
 
     private func prepareOnboardingSteam() async throws {
@@ -1164,7 +1176,7 @@ final class MacGamingUncleAppModel: ObservableObject {
         backgroundSteamWindowTask = nil
         if let bridge = downloadBridge() { await bridge.endBackgroundPresentation(showPending:true) }
         await sendSteamURI(destination.uri, status: L("正在打开 Steam 客户端…"),
-            completion: notice ?? L("请求已发送，请在 Steam 客户端中继续；若未显示窗口，可再次点击 Steam 客户端"))
+            completion: notice)
     }
 
     func loadNativeSteamStore(force: Bool = false) async {
@@ -1612,10 +1624,8 @@ final class MacGamingUncleAppModel: ObservableObject {
                 try await Task.sleep(for: .milliseconds(500))
                 after = try await SteamClientProcessSnapshot.read(steamExecutable: steam)
             }
-            self.status = completion ?? (showWindow
-                ? L("请求已发送，请在 Steam 客户端中继续；若未显示窗口，可再次点击 Steam 客户端")
-                : L("正在连接 Steam 后台…"))
-            self.steamClientNotice = self.status
+            self.status = completion ?? (showWindow ? "" : L("正在连接 Steam 后台…"))
+            self.steamClientNotice = self.status.isEmpty ? nil : self.status
         }
         if lastError != nil { steamClientNotice = L("未能打开 Steam 客户端，请检查错误提示后重试") }
         await syncSteamLibrary()

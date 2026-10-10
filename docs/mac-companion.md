@@ -77,3 +77,7 @@ Xbox/Home remains a macOS system action. The Menu+B chord avoids depending on de
 ### 默认空间音频运行时
 
 首次环境准备自动从 Portlane Release 下载 Wine `11.0.9-services.1`，按固定大小与 SHA-256 校验后安装。无需额外手动导入；已有安装不强制切换用户选择的运行时，仍可在运行组件中安装最新版本并选择服务版。单独的 Wine 压缩包继续提供手动/离线导入。
+
+### 启动时打开 Steam
+
+已有环境安装与登录记录时，应用启动完成检查后自动打开官方 Windows Steam 游戏库，每次应用运行只自动请求一次。使用正常的客户端打开路径复用现有 Steam 会话，不停止 Wine 或游戏。首次安装继续由环境准备和登录流程打开 Steam，准备失败时保留错误提示与手动重试入口。

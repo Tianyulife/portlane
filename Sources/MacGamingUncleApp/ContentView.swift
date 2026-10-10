@@ -34,30 +34,20 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 14) {
-                PortlaneMark(size: 28)
-                Text(AppBrand.name).font(.system(size: 18, weight: .medium))
-                Text(L("Mac 兼容设置")).font(.system(size: 13)).foregroundStyle(IndiePalette.secondaryText)
-                Spacer()
-                Label(model.steamLaunchRelayActive ? L("Steam 启动衔接已连接") : L("等待 Steam 启动衔接"),
-                      systemImage: model.steamLaunchRelayActive ? "checkmark.circle.fill" : "circle")
-                    .font(.caption).foregroundStyle(model.steamLaunchRelayActive ? IndiePalette.green : IndiePalette.secondaryText)
-                Button(L("打开 Windows Steam"), systemImage: "arrow.up.forward.app") {
-                    Task { await model.openSteamClient() }
-                }.disabled(model.isOpeningSteamClient || model.isWorking)
-            }
-            .padding(.leading, 108).padding(.trailing, 24).frame(height: 60)
-            .background(IndiePalette.topBar)
+            companionHeader
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     navigation(L("游戏配置"), icon: "slider.horizontal.3", target: .games)
                     navigation(L("运行组件"), icon: "shippingbox", target: .runtime)
                     navigation(L("诊断"), icon: "waveform.path.ecg", target: .diagnostics)
                     Spacer()
-                    Button(L("Mac 手柄管理"), systemImage: "gamecontroller") { showControllers = true }
-                    Button(L("全局偏好设置"), systemImage: "gearshape") { showPreferences = true }
-                    Text(L("商店、游戏库与下载\n由 Windows Steam 管理"))
-                        .font(.caption).foregroundStyle(IndiePalette.secondaryText).padding(.top, 18)
+                    Rectangle().fill(IndiePalette.border).frame(height: 1)
+                        .padding(.horizontal, 10).padding(.bottom, 10)
+                    VStack(spacing: 8) {
+                        sidebarUtility(L("手柄管理"), icon: "gamecontroller") { showControllers = true }
+                        sidebarUtility(L("偏好设置"), icon: "gearshape") { showPreferences = true }
+                    }
+                    .padding(.bottom, 4)
                 }
                 .buttonStyle(.plain).padding(16).frame(width: 190).frame(maxHeight: .infinity)
                 .background(IndiePalette.sidebar)
@@ -136,9 +126,66 @@ struct ContentView: View {
         .sheet(item: $model.pendingSteamInstall) { target in SteamStorageView(target: target).environmentObject(model) }
     }
 
+    private var companionHeader: some View {
+        HStack(spacing: 20) {
+            HStack(spacing: 10) {
+                PortlaneMark(size: 34)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(AppBrand.name).font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.92))
+                    Text(L("Mac 兼容设置")).font(.system(size: 11))
+                        .foregroundStyle(IndiePalette.secondaryText)
+                }
+            }
+            Spacer(minLength: 24)
+            HStack(spacing: 16) {
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text("Windows Steam").font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.82))
+                    HStack(spacing: 5) {
+                        Circle().fill(model.steamLaunchRelayActive ? IndiePalette.green : IndiePalette.secondaryText)
+                            .frame(width: 5, height: 5)
+                        Text(model.steamLaunchRelayActive ? L("启动衔接已连接") : L("等待启动衔接"))
+                            .font(.system(size: 10)).foregroundStyle(IndiePalette.secondaryText)
+                    }
+                }
+                Rectangle().fill(IndiePalette.border).frame(width: 1, height: 26)
+                Button {
+                    Task { await model.openSteamClient() }
+                } label: {
+                    HStack(spacing: 8) {
+                        SteamBrandMark().frame(width: 20, height: 20)
+                        Text(L("打开 Steam")).font(.system(size: 12, weight: .medium))
+                        Image(systemName: "arrow.up.right").font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.6))
+                    }
+                }
+                .buttonStyle(SteamButtonStyle(prominent: true))
+                .disabled(model.isOpeningSteamClient || model.isWorking)
+                .accessibilityLabel(L("打开 Windows Steam"))
+            }
+        }
+        .padding(.horizontal, 24).frame(height: 58)
+        .background(IndiePalette.topBar)
+        .overlay(alignment: .bottom) { Rectangle().fill(IndiePalette.border).frame(height: 1) }
+    }
+
     private func select(_ next: CompanionDestination) {
         guard next != destination else { return }
         if hasUnsavedGameSettings { pendingDestination = next } else { destination = next }
+    }
+
+    private func sidebarUtility(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 16)).frame(width: 20)
+                Text(title).font(.system(size: 13, weight: .medium)).lineLimit(2)
+            }
+            .foregroundStyle(Color.white.opacity(0.72))
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.horizontal, 10).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func navigation(_ title: String, icon: String, target: CompanionDestination) -> some View {
@@ -204,6 +251,22 @@ struct PortlaneMark: View {
             }
         }
         .frame(width: size, height: size).accessibilityHidden(true)
+    }
+}
+
+private struct SteamBrandMark: View {
+    private var image: NSImage? {
+        PackagedResources.bundle(named: "MacGamingUncle_MacGamingUncleApp", development: Bundle.module)?
+            .url(forResource: "steam-mark", withExtension: "png").flatMap(NSImage.init(contentsOf:))
+    }
+    var body: some View {
+        Group {
+            if let image {
+                Image(nsImage: image).resizable().interpolation(.high).scaledToFit()
+            } else {
+                Image(systemName: "play.circle.fill")
+            }
+        }.accessibilityHidden(true)
     }
 }
 
