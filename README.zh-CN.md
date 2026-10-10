@@ -23,7 +23,7 @@ Portlane 的空间音频运行时支持游戏通过 **Windows Spatial Audio** �
 - **运行时验证：** `11.0.9-services.1` 在 7.1.4 输出下执行 3,090 项空间音频检查，0 失败、0 跳过，保留 2 项既有 todo。
 - **逐游戏诊断：** 可以为单款游戏启用空间音频诊断日志，检查端点、对象容量与渲染状态。
 
-使用时，在 **运行组件** 中导入并选择包含空间音频补丁的运行时（当前验证版本为 `11.0.9-services.1`），在 macOS 中配置输出设备，并在支持的游戏中启用空间／全景声音频选项。应用默认下载的旧 `11.0.2` 运行时尚未包含这套支持。
+首次准备环境时，应用会自动下载包含空间音频补丁的 `11.0.9-services.1` Wine，无需手动导入。在 macOS 中配置输出设备，并在支持的游戏中启用空间／全景声音频选项。已有安装保留原先选用的运行时，可在 **运行组件** 中安装并选择服务版。
 
 支持范围是 Windows 对象音频到 CoreAudio 的渲染；游戏需要实际提交空间对象，多声道设备需要暴露正确的声道布局。Dolby Atmos 编码直通和头部追踪尚未实现，实体扬声器方向、设备切换与长时间运行仍需进一步验收。
 
@@ -52,10 +52,10 @@ Portlane 的空间音频运行时支持游戏通过 **Windows Spatial Audio** �
 下载 [Portlane 0.5.1 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/Portlane-0.5.1-macOS-arm64.dmg) 和 [空间音频 Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz)。完整资源与 SHA-256 校验文件见 [Release 页面](https://github.com/Tianyulife/portlane/releases/tag/v0.5.1)。
 
 1. 打开 DMG，将 **Portlane** 拖到 **Applications（应用程序）**，再从应用程序目录打开。
-2. 解压 Wine 的 `.tar.xz`，得到 `wine-runtime` 文件夹。
-3. 在 **运行组件 → 导入本地 Wine** 中选择该文件夹，再选择 `11.0.9-services.1` 作为活动运行时。
+2. 完成首次环境准备，应用自动下载并校验空间音频 Wine `11.0.9-services.1`。
+3. 手动或离线安装也可以：解压单独提供的 Wine `.tar.xz`，在 **运行组件 → 导入本地 Wine** 中选择 `wine-runtime` 文件夹，再选为活动运行时。
 
-安装包是尚未公证的 ad-hoc 签名研究预览版。空间音频 Wine 随 Release 单独提供，应用默认下载仍为旧 `11.0.2`；启用空间音频请按上述步骤导入。
+安装包是尚未公证的 ad-hoc 签名研究预览版。应用默认下载空间音频 Wine，首次环境准备需要联网；Release 也单独提供同一运行时用于手动导入。
 
 ### 编译并打开
 
@@ -125,7 +125,7 @@ swift build -c release
 swift run macgamingunclectl --json doctor
 ```
 
-最近一次本地 Swift 测试执行 117 项，4 项可选集成测试跳过，无失败。启动衔接回归测试覆盖拦截、重复请求、非受管理调用、重连和租约过期；Release 构建及打包资源、签名检查也已通过。这些验证不代表所有 Steam 更新与游戏版本都兼容。
+最近一次本地 Swift 测试执行 118 项，4 项可选集成测试跳过，无失败。启动衔接回归测试覆盖拦截、重复请求、非受管理调用、重连和租约过期；Release 构建及打包资源、签名检查也已通过。这些验证不代表所有 Steam 更新与游戏版本都兼容。
 
 更多资料：[架构说明](docs/ARCHITECTURE.md)、[运行时供应链](docs/RUNTIME_SUPPLY_CHAIN.md)、[测试指南](docs/TESTING.md)、[GPTK 下载与导入](docs/GPTK_DISTRIBUTION.md)。
 

@@ -23,7 +23,7 @@ Portlane's spatial audio runtime supports static beds and dynamic audio objects 
 - **Runtime validation:** `11.0.9-services.1` completed 3,090 spatial audio checks on the 7.1.4 endpoint with zero failures or skips, retaining two existing todo results.
 - **Per-game diagnostics:** optional spatial audio logs expose endpoint, object-capacity, and rendering information.
 
-To use it, import and select a runtime containing the spatial audio patches under **Runtime components** (the currently validated build is `11.0.9-services.1`), configure the macOS output device, and enable spatial/Atmos audio in a supported game. The app's default older `11.0.2` runtime download does not yet include this support.
+Initial environment setup automatically downloads Wine `11.0.9-services.1` with the spatial audio patches; no manual import is needed. Configure the macOS output device and enable spatial/Atmos audio in a supported game. Existing installations keep their selected runtime; install and select the services build under **Runtime components** to upgrade.
 
 Support covers Windows object audio rendered through CoreAudio. Games must submit spatial objects, and multichannel devices must expose the correct speaker layout. Dolby Atmos encoded bitstream passthrough and head tracking are not implemented; physical speaker direction, device changes, and long sessions still need further acceptance testing.
 
@@ -52,10 +52,10 @@ Portlane's workspace has three main pages: **Game configuration**, **Runtime com
 Download the [Portlane 0.5.1 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/Portlane-0.5.1-macOS-arm64.dmg) and [spatial audio Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz). All assets and SHA-256 files are on the [Release page](https://github.com/Tianyulife/portlane/releases/tag/v0.5.1).
 
 1. Open the DMG, drag **Portlane** to **Applications**, then open it from that folder.
-2. Extract the Wine `.tar.xz` to obtain the `wine-runtime` folder.
-3. Under **Runtime components → Import local Wine**, select that folder, then select `11.0.9-services.1` as the active runtime.
+2. Complete initial environment setup to automatically download and verify spatial audio Wine `11.0.9-services.1`.
+3. For manual or offline installation, extract the separately supplied Wine `.tar.xz`, import its `wine-runtime` folder under **Runtime components → Import local Wine**, and select it as the active runtime.
 
-This is an ad-hoc signed research preview and is not notarized. Spatial audio Wine is a separate Release asset; the app's default runtime download remains the older `11.0.2`. Import the supplied runtime to enable spatial audio.
+This is an ad-hoc signed research preview and is not notarized. Initial environment setup requires an internet connection and downloads spatial audio Wine by default. The same runtime is also provided as a separate Release asset for manual import.
 
 ### Build and open
 
@@ -125,7 +125,7 @@ swift build -c release
 swift run macgamingunclectl --json doctor
 ```
 
-The latest local Swift suite completed 117 tests with four optional integration skips and no failures. Relay regression tests cover interception, duplicate requests, unmanaged calls, reconnection, and lease expiry. Release builds and packaged resource/signature checks also passed. These checks do not establish compatibility with every Steam or game update.
+The latest local Swift suite completed 118 tests with four optional integration skips and no failures. Relay regression tests cover interception, duplicate requests, unmanaged calls, reconnection, and lease expiry. Release builds and packaged resource/signature checks also passed. These checks do not establish compatibility with every Steam or game update.
 
 More details: [architecture](docs/ARCHITECTURE.md), [runtime supply chain](docs/RUNTIME_SUPPLY_CHAIN.md), [testing](docs/TESTING.md), [GPTK distribution](docs/GPTK_DISTRIBUTION.md).
 

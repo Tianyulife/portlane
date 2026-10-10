@@ -184,12 +184,32 @@ final class IndieRuntimeTests: XCTestCase {
     func testIndieWine11RuntimeManifestIsPinned() {
         let manifest = CommunityIndieWineBootstrapper.manifest
         XCTAssertEqual(manifest.id, "org.indie.wine11")
-        XCTAssertEqual(manifest.version, SemanticVersion(major: 11, minor: 0, patch: 2))
+        XCTAssertEqual(manifest.version, SemanticVersion(major: 11, minor: 0, patch: 9, prerelease: "services.1"))
         XCTAssertEqual(manifest.artifacts.count, 1)
         XCTAssertTrue(manifest.artifacts.allSatisfy { $0.sha256.count == 64 && $0.size > 0 })
         XCTAssertTrue(manifest.capabilities.renderers.contains(.d3dMetal))
         XCTAssertTrue(manifest.capabilities.supportsWoW64)
         XCTAssertTrue(manifest.capabilities.supportsMSync)
+    }
+
+    func testDefaultSpatialWineDownloadAndInstallation() async throws {
+        guard ProcessInfo.processInfo.environment["PORTLANE_TEST_WINE_DOWNLOAD"] == "1" else {
+            throw XCTSkip("Set PORTLANE_TEST_WINE_DOWNLOAD=1 to verify the public spatial Wine download")
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("portlane-spatial-download-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let bootstrapper = CommunityIndieWineBootstrapper(paths: IndiePaths(root: root))
+        let installed = try await bootstrapper.installLatest()
+        XCTAssertEqual(installed.manifest.version.description, "11.0.9-services.1")
+        let payloadVersion = try String(contentsOf: installed.root.appendingPathComponent("runtime-version.txt"), encoding: .utf8)
+        XCTAssertEqual(payloadVersion.trimmingCharacters(in: .whitespacesAndNewlines), "11.0.9-services.1")
+        XCTAssertTrue(CommunityIndieWineBootstrapper.isCompleteRuntime(installed.root))
+        XCTAssertTrue(CommunityIndieWineBootstrapper.hasControllerSupport(installed.root))
+        let patches = try FileManager.default.contentsOfDirectory(atPath: installed.root.appendingPathComponent("source-patches/wine11").path)
+        XCTAssertTrue(patches.contains { $0.contains("spatial") })
+        let cached = try await bootstrapper.installLatest()
+        XCTAssertEqual(cached.root, installed.root)
+        XCTAssertEqual(cached.importedAt.timeIntervalSince1970, installed.importedAt.timeIntervalSince1970, accuracy: 1)
     }
 
     func testIndieWine11LocalBuildInstallation() async throws {

@@ -1,13 +1,13 @@
 import Foundation
 import IndieCore
 
-/// Installs the reproducible Wine 11 runtime maintained by Mac Gaming Uncle.
+/// Installs the reproducible Wine 11 runtime maintained by Portlane.
 ///
 /// The archive contains only LGPL/open-source Wine and its open-source host
 /// dependencies. Apple D3DMetal remains a separate, user-imported component.
 public actor CommunityIndieWineBootstrapper {
     public static let runtimeID = "org.indie.wine11"
-    public static let version = SemanticVersion(major: 11, minor: 0, patch: 2)
+    public static let version = SemanticVersion(major: 11, minor: 0, patch: 9, prerelease: "services.1")
 
     private let paths: IndiePaths
     private let session: URLSession
@@ -153,7 +153,7 @@ public actor CommunityIndieWineBootstrapper {
 
     public static let manifest = RuntimeManifest(
         id: runtimeID,
-        displayName: L("Portlane Wine 11 手柄增强游戏引擎"),
+        displayName: L("Portlane Wine 11 空间音频与手柄游戏引擎"),
         version: version,
         channel: .experimental,
         hostArchitecture: .x86_64,
@@ -165,9 +165,9 @@ public actor CommunityIndieWineBootstrapper {
             supportsMSync: true
         ),
         artifacts: [ArtifactDescriptor(
-            url: URL(string: "https://github.com/enginefuture/mac-gaming-uncle/releases/download/v0.3.0/indie-wine-11.0.2-macos-x86_64.tar.xz")!,
-            sha256: "412d2135f70683c34e80f50c4fa209a53be8ec9656dd51dcb92af8049fce3150",
-            size: 46_596_600,
+            url: URL(string: "https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz")!,
+            sha256: "de659037c2f514894d6e956e01751782b95c90b5387f2af01cf0772cba608405",
+            size: 53_466_580,
             archiveRoot: "wine-runtime"
         )],
         licenses: [
