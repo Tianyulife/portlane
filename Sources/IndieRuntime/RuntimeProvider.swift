@@ -122,9 +122,9 @@ public struct WineRuntimeProvider: RuntimeProvider, Sendable {
         )
     }
 
-    /// Wine's virtual desktop is the only generic resolution control that does
-    /// not rely on engine-specific flags. Steam and all of its child processes
-    /// stay inside the same per-launch desktop.
+    /// Preserve the Explorer desktop request for existing configurations and
+    /// Wine drivers that support it. The bundled macOS driver does not create
+    /// a movable desktop host; this is not a generic resolution/windowing fix.
     public func launchArguments(for plan: LaunchPlan) -> [String] {
         let executable = plan.windowsExecutablePath ?? plan.executable.path
         guard let resolution = plan.virtualDesktop, resolution.isValid else {
@@ -154,8 +154,42 @@ public struct WineRuntimeProvider: RuntimeProvider, Sendable {
 
     public func prepareBottleForInstaller(_ bottle: BottleRecord) async throws {
         await stopBottle(bottle)
-        try await registerCJKFonts(in: bottle)
+        do {
+            try await registerCJKFonts(in: bottle)
+        } catch {
+            await stopBottle(bottle)
+            throw error
+        }
         await stopBottle(bottle)
+    }
+
+    public func configureSteamDisplay(in bottle: BottleRecord, policy: SteamDisplayPolicy) async throws {
+        try await runPreparation(in: bottle, arguments: policy.registryArguments, operation: L("Steam 显示配置"))
+    }
+
+    /// Recovery is bounded and runs only on preparatory helpers, before Steam/game launch.
+    func runPreparation(in bottle: BottleRecord, arguments: [String], operation: String,
+                        timeout: Duration = .seconds(30)) async throws {
+        let logDirectory = bottle.root.appendingPathComponent(".indie-diagnostics", isDirectory: true)
+        try FileManager.default.createDirectory(at: logDirectory, withIntermediateDirectories: true)
+        let log = logDirectory.appendingPathComponent("wine-preparation.log")
+        for attempt in 1...2 {
+            do {
+                try await subprocess.run(wineBinary, arguments: arguments,
+                    environment: hostEnvironment.merging([
+                        "WINEPREFIX": bottle.root.path, "WINEDEBUG": "-all",
+                        "WINEDLLOVERRIDES": "mscoree,mshtml=", "LANG": "zh_CN.UTF-8", "LC_ALL": "zh_CN.UTF-8",
+                    ]) { _, new in new }, workingDirectory: bottle.root, timeout: timeout)
+                try? "\(operation): attempt \(attempt) succeeded\n".write(to: log, atomically: true, encoding: .utf8)
+                return
+            } catch IndieError.timedOut {
+                try? "\(operation): attempt \(attempt) timed out; stopping stale Wine helpers\n".write(to: log, atomically: true, encoding: .utf8)
+                await stopBottle(bottle)
+                if attempt == 2 {
+                    throw IndieError.timedOut(L("\(operation)（已清理残留进程并重试；诊断日志：\(log.path)）"))
+                }
+            }
+        }
     }
 
     /// Uses Wine's Vulkan renderer for Direct3D 10/11 instead of macOS' legacy
@@ -269,17 +303,7 @@ public struct WineRuntimeProvider: RuntimeProvider, Sendable {
 
     private func registerCJKFonts(in bottle: BottleRecord) async throws {
         let registration = try BottleFonts.prepare(in: bottle)
-        try await subprocess.run(
-            wineBinary,
-            arguments: ["regedit.exe", "/S", registration.registryWindowsPath],
-            environment: hostEnvironment.merging([
-                "WINEPREFIX": bottle.root.path,
-                "WINEDEBUG": "-all",
-                "WINEDLLOVERRIDES": "mscoree,mshtml=",
-                "LANG": "zh_CN.UTF-8",
-                "LC_ALL": "zh_CN.UTF-8",
-            ]) { _, new in new },
-            timeout: .seconds(30)
-        )
+        try await runPreparation(in: bottle,
+            arguments: ["regedit.exe", "/S", registration.registryWindowsPath], operation: L("Steam 中文字体注册"))
     }
 }

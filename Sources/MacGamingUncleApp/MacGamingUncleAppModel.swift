@@ -32,6 +32,13 @@ final class MacGamingUncleAppModel: ObservableObject {
     private var submittingSteamInstall = false
     private var backgroundSteamWindowTask: Task<Void, Never>?
     private var steamInstallSubmittedAt: [UInt64: Date] = [:]
+    private var steamCloudStates: [UInt64: SteamCloudState] = [:]
+    private var isWaitingForSteamCloud = false
+    private let cloudObservationStartedAt = Date()
+    private var shuttingDownManagedSteam = false
+    private var cloudRequirements: [UInt64: SteamCloudUploadRequirement] = [:]
+    private var cloudPoll: Task<Void, Never>?
+    private let cloudPersistenceKey = "pendingSteamCloudUploads"
     @Published var gameLaunchStates: [UInt64: GameLaunchState] = [:]
     @Published private(set) var gameLaunchReports: [UInt64: GameLaunchReport] = [:]
     private var gameLaunchMonitors: [UInt64: Task<Void, Never>] = [:]
@@ -54,7 +61,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                         for appID in snapshot.appIDs where !self.pendingSteamPlayRequests.contains(appID) {
                             self.pendingSteamPlayRequests.append(appID)
                         }
-                        if self.steamPlayRequestTask == nil, !self.isWorking, !self.isOpeningSteamClient, let appID = self.pendingSteamPlayRequests.first {
+                        if self.steamPlayRequestTask == nil, !self.shuttingDownManagedSteam, !self.isWaitingForSteamCloud, !self.isWorking, !self.isOpeningSteamClient, let appID = self.pendingSteamPlayRequests.first {
                             self.pendingSteamPlayRequests.removeFirst()
                             self.steamPlayRequestTask = Task {
                                 defer { self.steamPlayRequestTask = nil }
@@ -210,6 +217,11 @@ final class MacGamingUncleAppModel: ObservableObject {
         store = StateStore(databaseURL: paths.database)
         controllerManager = ControllerManager()
         steamSessionManager = SteamSessionManager()
+        if let data = UserDefaults.standard.data(forKey: cloudPersistenceKey),
+           let restored = try? IndieJSON.decoder().decode([SteamCloudUploadRequirement].self, from: data) {
+            cloudRequirements = Dictionary(restored.map { ($0.appID, $0) }, uniquingKeysWith: { _, latest in latest })
+
+        }
         onboardingTask = Task {
             await refresh()
             await runOnboarding()
@@ -220,37 +232,125 @@ final class MacGamingUncleAppModel: ObservableObject {
     var onboardingWineReady: Bool { gamingWineRuntime != nil }
     var onboardingDXMTReady: Bool { rendererOverlays.contains { $0.kind == .dxmt } }
 
-    func shutdownManagedSteam() async {
-        steamLaunchRelayTask?.cancel()
-        steamPlayRequestTask?.cancel()
-        await steamLaunchRelayTask?.value
-        await steamPlayRequestTask?.value
-        for monitor in gameLaunchMonitors.values { monitor.cancel() }
-        gameLaunchMonitors.removeAll()
+    /// False leaves Steam and the app alive; the delegate can offer to quit only the app.
+    func shutdownManagedSteam() async -> Bool {
+        shuttingDownManagedSteam = true
+        defer { shuttingDownManagedSteam = false }
         onboardingTask?.cancel()
         gptkSetupTask?.cancel()
         steamMetadataTask?.cancel()
-        // Join first so an installation cannot launch Steam after shutdown.
         await onboardingTask?.value
         await gptkSetupTask?.value
-        steamSessionManager.didStop()
-        guard let bottle = steamBottle, let runtime = gamingWineRuntime else { return }
-        let environment = ["WINEPREFIX": bottle.root.path, "WINEDEBUG": "-all",
-                           "DYLD_LIBRARY_PATH": runtime.root.appendingPathComponent("lib").path]
-        if let steam = steamExecutable {
-            _ = try? await Subprocess().run(
-                runtime.root.appendingPathComponent("bin/wine"),
-                arguments: [steam.path, "-shutdown"], environment: environment,
+        // A preparation/launch already in progress must never race a shutdown.
+        guard !isWorking, !isOpeningSteamClient else { return false }
+        guard let bottle = steamBottle, let runtime = gamingWineRuntime, let steam = steamExecutable else { return true }
+        do {
+            try await requireNoRunningSteamGames(in: bottle)
+            try await requireNoActiveSteamDownloads(in: bottle)
+            try await waitForSteamCloud()
+            try await requireNoRunningSteamGames(in: bottle)
+            try await requireNoActiveSteamDownloads(in: bottle)
+            let provider = WineRuntimeProvider(manifest: runtime.manifest, root: runtime.root)
+            _ = try await Subprocess().run(
+                provider.wineBinary, arguments: [steam.path, "-shutdown"],
+                environment: ["WINEPREFIX": bottle.root.path, "WINEDEBUG": "-all",
+                              "DYLD_LIBRARY_PATH": runtime.root.appendingPathComponent("lib").path],
                 workingDirectory: steam.deletingLastPathComponent(),
-                timeout: .seconds(10), requireSuccess: false
+                timeout: .seconds(10)
             )
-            _ = try? await Subprocess().run(
-                runtime.root.appendingPathComponent("bin/wineserver"),
-                arguments: ["-w"], environment: environment,
-                timeout: .seconds(8), requireSuccess: false
-            )
+            // A successful command is only a request. Do not kill a still-running client.
+            let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+            while try await SteamClientProcessSnapshot.read(steamExecutable: steam).hasClients {
+                guard ContinuousClock.now < deadline else { return false }
+                try await Task.sleep(for: .milliseconds(500))
+            }
+            steamLaunchRelayTask?.cancel()
+            steamPlayRequestTask?.cancel()
+            await steamLaunchRelayTask?.value
+            await steamPlayRequestTask?.value
+            for monitor in gameLaunchMonitors.values { monitor.cancel() }
+            gameLaunchMonitors.removeAll()
+            steamSessionManager.didStop()
+            return true
+        } catch {
+            steamClientNotice = error.localizedDescription
+            return false
         }
-        await WineRuntimeProvider(manifest: runtime.manifest, root: runtime.root).stopBottle(bottle)
+    }
+
+    private func requireNoRunningSteamGames(in bottle: BottleRecord) async throws {
+        guard !gameLaunchStates.values.contains(where: { $0 == .running || $0 == .waiting }) else {
+            throw IndieError.invalidArgument(L("请先退出正在运行的游戏，再切换显示或运行环境设置"))
+        }
+        // Include partially installed/updating games: their files may still be running.
+        for game in steamGames + steamDownloads {
+            guard let executable = try? SteamExecutableResolver.shippingExecutable(for: game) else { continue }
+            if try await GameProcessProbe.isRunning(windowsPath: WinePath.windowsPath(for: executable, in: bottle)) {
+                throw IndieError.invalidArgument(L("请先退出正在运行的游戏，再切换显示或运行环境设置"))
+            }
+        }
+    }
+
+    private func requireNoActiveSteamDownloads(in bottle: BottleRecord) async throws {
+        guard SteamCompatibilityManager.isLoggedOn(in: bottle) else { return }
+        guard let bridge = downloadBridge() else {
+            throw IndieError.invalidArgument(L("Steam 下载状态尚未确认，请在 Steam 中检查后重试"))
+        }
+        let downloads = try await bridge.downloads()
+        guard !downloads.contains(where: { !$0.completed && !$0.paused }) else {
+            throw IndieError.invalidArgument(L("Steam 仍有活动下载，请先暂停下载后重试"))
+        }
+    }
+
+    private func persistCloudRequirements() {
+
+        if let data = try? IndieJSON.encoder().encode(Array(cloudRequirements.values)) {
+            UserDefaults.standard.set(data, forKey: cloudPersistenceKey)
+        }
+    }
+
+    private func trackCloudUpload(for appID: UInt64) {
+        guard cloudRequirements[appID] == nil, let steam = steamExecutable else { return }
+        cloudRequirements[appID] = .init(appID: appID,
+            accountID: SteamCloudLog.accountID(steamDirectory: steam.deletingLastPathComponent()), beganAt: Date())
+        persistCloudRequirements()
+    }
+
+    private func refreshSteamCloud() async {
+        guard let steam = steamExecutable else { steamCloudStates = [:]; return }
+        let directory = steam.deletingLastPathComponent()
+        let since = min(cloudObservationStartedAt, cloudRequirements.values.map(\.beganAt).min() ?? cloudObservationStartedAt)
+        let observation = await Task.detached(priority: .utility) {
+            SteamCloudLog.read(steamDirectory: directory, since: since)
+        }.value
+        steamCloudStates = observation.states
+        var changed = false
+        for (id, requirement) in cloudRequirements {
+            if gameLaunchStates[id] != .running && observation.confirms(requirement) {
+                cloudRequirements[id] = nil
+                changed = true
+            } else if gameLaunchStates[id] != .running {
+                // A missing acknowledgement is not evidence of an active upload.
+                steamCloudStates[id] = observation.states[id] ?? .unknown
+            }
+        }
+        if changed { persistCloudRequirements() }
+    }
+
+    private func waitForSteamCloud() async throws {
+        isWaitingForSteamCloud = true
+        defer { isWaitingForSteamCloud = false }
+        let deadline = ContinuousClock.now.advanced(by: .seconds(60))
+        repeat {
+            try Task.checkCancellation()
+            await refreshSteamCloud()
+            if cloudRequirements.isEmpty && !steamCloudStates.values.contains(where: { $0.blocksRestart }) { return }
+            status = L("正在等待 Steam 上传云存档…")
+            guard ContinuousClock.now < deadline else {
+                throw IndieError.timedOut(L("云存档上传尚未确认，已保留 Steam；请打开 Steam 客户端检查同步状态后重试"))
+            }
+            try await Task.sleep(for: .seconds(1))
+        } while true
     }
 
     func retryOnboarding() {
@@ -366,7 +466,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             let updatePlan = try LaunchPlanBuilder.build(
                 executable: steam, windowsExecutablePath: try WinePath.windowsPath(for: steam, in: bottle), bottle: bottle,
                 profile: .init(runtimeID: runtime.manifest.id, preferredRenderer: .wineD3D,
-                               arguments: ["-no-cef-sandbox"], environment: ["WINEDEBUG": "-all", "WINEDLLOVERRIDES": "mscoree,mshtml="]),
+                               arguments: ["-no-cef-sandbox"], environment: ["WINEDEBUG": "-all"]),
                 analysis: try PEAnalyzer.analyze(at: steam), recipe: nil, installed: .init(available: [.wineD3D])
             )
             _ = try await provider.launchDetached(updatePlan, logURL: paths.logs.appendingPathComponent("onboarding-steam-update.log"))
@@ -387,7 +487,7 @@ final class MacGamingUncleAppModel: ObservableObject {
         try await provider.configureControllerSupport(in: bottle)
         _ = try SteamCompatibilityManager.prepare(bottle: bottle, wrapper: wrapper)
         let environment = ["WINEDEBUG": "-all", "LANG": "zh_CN.UTF-8", "LC_ALL": "zh_CN.UTF-8",
-                           "WINEDLLOVERRIDES": "mscoree,mshtml=;winedbg.exe=d;dxgi,d3d10,d3d10core,d3d11,d3d12=b"]
+                           "WINEDLLOVERRIDES": "winedbg.exe=d;dxgi,d3d10,d3d10core,d3d11,d3d12=b"]
         let plan = try LaunchPlanBuilder.build(
             executable: steam, windowsExecutablePath: try WinePath.windowsPath(for: steam, in: bottle), bottle: bottle,
             profile: .init(runtimeID: runtime.manifest.id, preferredRenderer: .wineD3D,
@@ -565,7 +665,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     }
 
     func launchSteamGame(_ game: SteamGame, fromSteamPlay: Bool = false) async {
-        guard !isWorking, gameLaunchStates[game.appID]?.blocksLaunch != true else { return }
+        guard !isWorking, !shuttingDownManagedSteam, !isWaitingForSteamCloud, gameLaunchStates[game.appID]?.blocksLaunch != true else { return }
         gameLaunchReports[game.appID] = GameLaunchReport(appID: game.appID, name: game.name)
         updateGameLaunch(game.appID, .preparing, L("检查游戏文件与运行组件"))
         await perform(L("正在为 \(game.name) 选择最佳图形后端…")) {
@@ -778,36 +878,21 @@ final class MacGamingUncleAppModel: ObservableObject {
                 SteamCompatibilityManager.isLoggedOn(in: bottle)
             self.updateGameLaunch(game.appID, .preparing, reusingSteam ? L("连接已登录的 Steam 会话") : L("检查共享会话并准备 Steam 运行环境"))
             if !reusingSteam {
-                let downloads: [SteamBridgeDownload]
-                if SteamCompatibilityManager.isLoggedOn(in: bottle), let bridge = self.downloadBridge() {
-                    // Fail closed if a live client's download state cannot be
-                    // checked before restarting its shared environment.
-                    downloads = try await bridge.downloads()
-                } else { downloads = [] }
-                guard !downloads.contains(where: { !$0.completed && !$0.paused }) else {
-                    throw IndieError.invalidArgument(L("此游戏需要切换 Steam 运行环境，请先暂停 Steam 下载再启动"))
-                }
+                try await self.requireNoActiveSteamDownloads(in: bottle)
                 // A DPI/topology change requires stopping the shared prefix.
                 // Never silently interrupt another game, including one opened in Steam.
-                for installedGame in self.steamGames {
-                    guard let otherExecutable = try? SteamExecutableResolver.shippingExecutable(for: installedGame) else { continue }
-                    let otherPath = try WinePath.windowsPath(for: otherExecutable, in: bottle)
-                    if try await GameProcessProbe.isRunning(windowsPath: otherPath) {
-                        throw IndieError.invalidArgument(L("请先退出正在运行的游戏，再切换显示或运行环境设置"))
-                    }
-                }
+                try await self.requireNoRunningSteamGames(in: bottle)
+                try await self.waitForSteamCloud()
+                try await self.requireNoRunningSteamGames(in: bottle)
+                try await self.requireNoActiveSteamDownloads(in: bottle)
                 self.steamSessionManager.didStop()
                 self.updateGameLaunch(game.appID, .preparing, L("配置 Wine、显示与手柄支持"))
                 self.status = L("正在准备全局 Steam 会话…")
                 try await gamingProvider.prepareBottleForInstaller(bottle)
                 // Apply only after all old Wine processes have stopped. The reg
                 // helper itself starts Wine, so stop it before creating Steam.
-                _ = try await Subprocess().run(
-                    gamingProvider.wineBinary, arguments: displayPolicy.registryArguments,
-                    environment: ["WINEPREFIX": bottle.root.path,
-                                  "DYLD_LIBRARY_PATH": gamingRuntime.root.appendingPathComponent("lib").path,
-                                  "WINEDEBUG": "-all"], timeout: .seconds(30)
-                )
+                self.status = L("正在配置 Steam 显示…")
+                try await gamingProvider.configureSteamDisplay(in: bottle, policy: displayPolicy)
                 await gamingProvider.stopBottle(bottle)
                 try await gamingProvider.configureControllerSupport(in: bottle)
                 guard let wrapper = SteamCompatibilityManager.bundledWrapperURL() else {
@@ -885,6 +970,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                         if firstSeenAt == nil { firstSeenAt = Date() }
                         didRun = true
                         consecutiveMissing = 0
+                        self.trackCloudUpload(for: appID)
                         self.updateGameLaunch(appID, .running, L("检测到游戏进程"))
                     } else if didRun {
                         consecutiveMissing += 1
@@ -894,6 +980,7 @@ final class MacGamingUncleAppModel: ObservableObject {
                             } else {
                                 self.updateGameLaunch(appID, .idle, L("游戏进程已退出"))
                             }
+                            await self.refreshSteamCloud()
                             self.gameLaunchMonitors[appID] = nil
                             return
                         }
@@ -1125,6 +1212,13 @@ final class MacGamingUncleAppModel: ObservableObject {
     }
 
     private func pollSteamDownloads() {
+        if cloudPoll == nil {
+            cloudPoll = Task { [weak self] in
+                guard let self else { return }
+                defer { self.cloudPoll = nil }
+                await self.refreshSteamCloud()
+            }
+        }
         guard steamBridgePoll == nil, let bridge = downloadBridge() else { return }
         steamBridgePoll = Task { [weak self] in
             guard let self else { return }
@@ -1412,7 +1506,7 @@ final class MacGamingUncleAppModel: ObservableObject {
     }
 
     private func perform(_ initialStatus: String, operation: @escaping @MainActor () async throws -> Void) async {
-        guard !isWorking else { return }
+        guard !isWorking, !shuttingDownManagedSteam, !isWaitingForSteamCloud else { return }
         isWorking = true
         lastError = nil
         status = initialStatus
@@ -1559,7 +1653,7 @@ final class MacGamingUncleAppModel: ObservableObject {
 
     private func sendSteamURI(_ uri: String, status initialStatus: String, completion: String? = nil,
                               showWindow: Bool = true) async {
-        guard !isOpeningSteamClient else { return }
+        guard !isOpeningSteamClient, !shuttingDownManagedSteam else { return }
         guard !isWorking else {
             steamClientNotice = L("正在处理其他操作，请稍后打开 Steam 客户端");
             return
@@ -1588,7 +1682,7 @@ final class MacGamingUncleAppModel: ObservableObject {
             }
             let environment = previous?.environment ?? [
                 "LANG": "zh_CN.UTF-8", "LC_ALL": "zh_CN.UTF-8", "WINEDEBUG": "-all",
-                "WINEDLLOVERRIDES": "mscoree,mshtml=;winedbg.exe=d;dxgi,d3d10,d3d10core,d3d11,d3d12=b"
+                "WINEDLLOVERRIDES": "winedbg.exe=d;dxgi,d3d10,d3d10core,d3d11,d3d12=b"
             ]
             let profile = LaunchProfile(runtimeID: runtime.manifest.id, preferredRenderer: .wineD3D,
                 syncBackend: environment["WINEMSYNC"] == "1" ? .msync : .wineserver,
@@ -1601,7 +1695,11 @@ final class MacGamingUncleAppModel: ObservableObject {
                                 directX: .none, antiCheat: .none, importedLibraries: []),
                 recipe: nil, installed: .init(available: [.wineD3D]))
             let log = self.paths.logs.appendingPathComponent("\(plan.id)-steam-client.log")
-            if showWindow || !before.hasClients {
+            var navigatedInClient = false
+            if showWindow, before.hasClients, let bridge = self.downloadBridge() {
+                navigatedInClient = (try? await bridge.navigateClient(uri:uri)) == true
+            }
+            if (showWindow && !navigatedInClient) || !before.hasClients {
                 _ = try await provider.launchDetached(plan, logURL: log)
             }
             // Focus only processes mapped to this exact Steam installation, not other bottles/games.
@@ -1619,6 +1717,11 @@ final class MacGamingUncleAppModel: ObservableObject {
             }
             for attempt in 0..<(showWindow ? 12 : 0) {
                 if attempt == 0, let bridge = self.downloadBridge() { try? await bridge.fitClientWindow() }
+                SteamClientActivation.authorizeFocus(after)
+                if let bridge=self.downloadBridge(), (try? await bridge.showClientWindow()) == true {
+                    _ = SteamClientActivation.show(after)
+                    break
+                }
                 if SteamClientActivation.show(after) { break }
                 if attempt == 11 { break }
                 try await Task.sleep(for: .milliseconds(500))

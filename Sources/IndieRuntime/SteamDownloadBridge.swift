@@ -11,6 +11,7 @@ public struct SteamBridgeDownload: Codable, Equatable, Sendable {
     public var downloadedBytes: Double? = nil
     public var totalBytes: Double? = nil
     public var bytesPerSecond: Double? = nil
+    public var phase: String? = nil
 }
 
 public enum SteamBridgeInstallResult: Sendable, Equatable {
@@ -71,7 +72,7 @@ public actor SteamDownloadBridge {
     }
 
     public func downloads() async throws -> [SteamBridgeDownload] {
-        let value = try await evaluate("window.__mguDownloads.lease=Date.now();window.__mguDownloads.items")
+        let value = try await evaluate("window.__mguDownloads.lease=Date.now();window.__mguDownloads.snapshot()")
         let data = try JSONSerialization.data(withJSONObject: value)
         return try JSONDecoder().decode([SteamBridgeDownload].self, from: data)
     }
@@ -224,6 +225,33 @@ public actor SteamDownloadBridge {
             guard let session = attached["sessionId"] as? String else { continue }
             _ = try? await command("Runtime.evaluate", params: ["expression":"SteamClient.Window.HideWindow();true", "returnByValue":true], directory:directory, session:session)
             _ = try? await command("Target.detachFromTarget", params:["sessionId":session], directory:directory)
+        }
+    }
+
+    /// Show only the actual Steam browser window, never all windows owned by Wine.
+    public func navigateClient(uri: String) async throws -> Bool {
+        guard uri.range(of:#"^steam://(?:open/main|nav/downloads|nav/games/details/[0-9]+|store/[0-9]+)$"#,options:.regularExpression) != nil else { return false }
+        let encoded=String(decoding:try JSONEncoder().encode(uri),as:UTF8.self)
+        return (try await evaluate("SteamClient.URL.ExecuteSteamURL(\(encoded));true") as? Bool) == true
+    }
+
+    public func showClientWindow() async throws -> Bool {
+        let directory = try activeDirectory()
+        let targets = try await command("Target.getTargets", directory:directory)
+        let matches = (targets["targetInfos"] as? [[String:Any]] ?? []).filter { $0["title"] as? String == "Steam" }
+        guard matches.count == 1, let id = matches.first?["targetId"] as? String else { return false }
+        let attached = try await command("Target.attachToTarget",params:["targetId":id,"flatten":true],directory:directory)
+        guard let session = attached["sessionId"] as? String else { return false }
+        do {
+            let result = try await command("Runtime.evaluate",params:[
+                "expression":"(async()=>{await SteamClient.Window.ShowWindow();await SteamClient.Window.BringToFront(1);return true})()",
+                "returnByValue":true,"userGesture":true,"awaitPromise":true
+            ],directory:directory,session:session)
+            _ = try? await command("Target.detachFromTarget",params:["sessionId":session],directory:directory)
+            return result["exceptionDetails"] == nil && ((result["result"] as? [String:Any])?["value"] as? Bool) == true
+        } catch {
+            _ = try? await command("Target.detachFromTarget",params:["sessionId":session],directory:directory)
+            throw error
         }
     }
 
@@ -444,35 +472,67 @@ public actor SteamDownloadBridge {
     // Only sanitized local download fields leave Steam. No account names, cookies, URLs or tokens.
     private static let subscription = #"""
     (()=>{
-      if(window.__mguDownloads?.version===3){window.__mguDownloads.lease=Date.now();return;}
+      if(window.__mguDownloads?.version===4){window.__mguDownloads.lease=Date.now();return;}
       const previous=window.__mguDownloads;
       if(previous){previous.handles?.forEach(h=>h?.unregister?.());previous.installHandle?.unregister?.();clearInterval(previous.timer);}
-      const s=window.__mguDownloads={version:3,lease:Date.now(),items:[],overview:null,handles:[]};
-      const number=v=>Number.isFinite(Number(v))&&v!=null?Math.max(0,Number(v)):null;
+      const s=window.__mguDownloads={version:4,lease:Date.now(),items:[],overview:null,handles:[]};
+      const number=v=>(typeof v==='number'||typeof v==='string'&&v.trim()!=='')&&Number.isFinite(Number(v))&&Number(v)>=0?Number(v):null;
+      const pair=(done,total)=>{
+        done=number(done);total=number(total);
+        return Number.isSafeInteger(done)&&Number.isSafeInteger(total)&&total>0&&done<=total?{downloadedBytes:done,totalBytes:total}:null;
+      };
+      // Current Steam: download is stage 2, including per-content-type counters.
+      const itemBytes=i=>{
+        if(Array.isArray(i.update_type_info)){
+          const stages=i.update_type_info.map(t=>t.progress?.[2]);
+          if(stages.some(Boolean)){
+            const valid=stages.map(p=>p&&pair(p.bytes_in_progress,p.bytes_total)).filter(Boolean);
+            return valid.length?pair(valid.reduce((n,p)=>n+p.downloadedBytes,0),valid.reduce((n,p)=>n+p.totalBytes,0)):null;
+          }
+        }
+        return pair(i.downloaded_bytes,i.total_bytes);
+      };
+      const applyOverview=()=>{
+        const o=s.overview;
+        if(!o||Date.now()-o.at>5000)return;
+        const item=s.items.find(i=>i.appID===o.appID&&!i.completed);
+        if(!item)return;
+        item.progress=o.progress??item.progress;
+        item.bytesPerSecond=item.paused?0:o.speed;
+        item.phase=o.phase;
+        if(o.bytes)Object.assign(item,o.bytes);
+      };
+      s.snapshot=()=>{
+        if(s.overview&&Date.now()-s.overview.at>5000){
+          s.overview=null;s.items.forEach(i=>{i.bytesPerSecond=null;i.phase=null;i.progress=null;});
+        }
+        return s.items;
+      };
       const c=window.SteamClient;
       if(!c?.Downloads?.RegisterForDownloadItems) {delete window.__mguDownloads;throw Error('not ready');}
       s.handles.push(c.Downloads.RegisterForDownloadItems((changed,groups)=>{
         const local=groups.find(g=>String(g.remote_client_id)==='0');
         if(!local)return; // remote-only deltas must not erase the local queue
-        const previous=new Map(s.items.map(i=>[i.appID,i]));
-        s.items=(local.item_data||[]).map(i=>({appID:Number(i.appid),completed:!!i.completed,
-          paused:!!i.paused,errorCode:Number(i.update_result)||0,
-          downloadedBytes:number(i.downloaded_bytes),totalBytes:number(i.total_bytes),
-          progress:i.completed?null:previous.get(Number(i.appid))?.progress??null,
-          bytesPerSecond:i.completed||i.paused?0:previous.get(Number(i.appid))?.bytesPerSecond??null}));
-        if(!s.items.some(i=>i.appID===s.overview?.appID&&!i.completed))s.overview=null;
+        s.items=(local.item_data||[]).map(i=>{
+          const bytes=itemBytes(i);
+          return {appID:Number(i.appid),completed:!!i.completed,paused:!!i.paused,errorCode:Number(i.update_result)||0,
+            downloadedBytes:bytes?.downloadedBytes??null,totalBytes:bytes?.totalBytes??null,
+            progress:!i.completed&&bytes?bytes.downloadedBytes/bytes.totalBytes:null,
+            bytesPerSecond:i.completed||i.paused?0:null,phase:null};
+        });
+        applyOverview();
       }));
       s.handles.push(c.Downloads.RegisterForDownloadOverview(o=>{
         if(String(o.remote_client_id)!=='0')return;
-        s.items.forEach(i=>{i.progress=null;i.bytesPerSecond=null;});
-        const item=s.items.find(i=>i.appID===Number(o.update_appid)&&!i.completed);
-        s.overview=item?{appID:item.appID}:null;
-        if(item&&Number.isFinite(o.overall_percent_complete))item.progress=Math.max(0,Math.min(1,o.overall_percent_complete/100));
-        if(item){
-          item.bytesPerSecond=item.paused?0:number(o.update_network_bytes_per_second);
-          item.downloadedBytes=number(o.update_bytes_downloaded)??item.downloadedBytes;
-          item.totalBytes=number(o.update_bytes_to_download)??item.totalBytes;
-        }
+        s.items.forEach(i=>{i.progress=null;i.bytesPerSecond=null;i.phase=null;});
+        const stage=o.progress?.[2];
+        const bytes=stage?pair(stage.bytes_in_progress,stage.bytes_total):pair(o.update_bytes_downloaded,o.update_bytes_to_download);
+        const percent=number(o.overall_percent_complete);
+        s.overview=Number(o.update_appid)>0?{appID:Number(o.update_appid),at:Date.now(),bytes,
+          progress:percent!=null&&percent<=100?percent/100:null,
+          speed:number(o.update_network_bytes_per_second),
+          phase:['Downloading','Staging','Verifying','Committing','Starting','Preallocating','Updating','Stopping','None'].includes(o.update_state)?o.update_state:null}:null;
+        applyOverview();
       }));
       s.timer=setInterval(()=>{if(Date.now()-s.lease>60000){s.handles.forEach(h=>h?.unregister?.());
         s.installHandle?.unregister?.();clearInterval(s.timer);delete window.__mguDownloads;}},30000);

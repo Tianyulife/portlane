@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-11",
+  "timezone": "Asia/Shanghai",
+  "state": "validated Portlane 0.6.0 prerelease",
+  "portlaneBase": "4cb917f05e76d1dc2f974b79f2818f19e5129415",
+  "upstreamSourceCommits": [
+    "bf1ada9b6c2e857c639534595772a20cb2ff19b4",
+    "2db077053c8646ca19124339fc0ad91c8c36a672",
+    "2cd8d61e65ccb04ffcec0f85d5156b1c5ddcab12"
+  ],
+  "swiftTests": {
+    "total": 149,
+    "skipped": 5,
+    "failures": 0
+  },
+  "checks": {
+    "scripts/check.sh": "passed: patch checks, localization source scan, three JavaScript suites, Swift tests, Release app and CLI builds, Steam helper and Windows fixtures",
+    "scripts/test-wine11-patches.py": "7 tests passed",
+    "scripts/test-steam-bridge.mjs": "passed: download states and bridge behavior",
+    "scripts/test-steam-launch-relay.mjs": "passed: interception, deduplication, passthrough, lease expiry and reconnect",
+    "scripts/test-steam-presentation.mjs": "passed: guards, native-window restoration, explicit opening and lease expiry",
+    "scripts/build-app.sh": "passed: Portlane identity/assets/resources and ad-hoc signature verification",
+    "scripts/check-packaged-localization.sh": "passed: relocated packaged English and Chinese resources",
+    "scripts/build-interpolation-fixtures.sh": "passed: capture, pattern and baseline probes built",
+    "scripts/build-dmg.sh": "passed: checksum, mounted signature and resource checks",
+    "CLR default-loading follow-up": "passed: 6 SteamClientHandoffTests, Release app rebuild, packaged localization, rebuilt DMG verification",
+    "cloud UI follow-up": "passed: 13 cloud tests, English/Chinese component render inspection, Release app rebuild, packaged localization and DMG checks",
+    "background-only cloud follow-up": "passed: 10 SteamCloudLogTests, Release app rebuild, packaged localization and DMG checks",
+    "0.6.0 final validation": "scripts/check.sh, Release app packaging, packaged localization and DMG verification passed on 2026-10-11"
+  },
+  "artifacts": {
+    "app": "dist/Portlane.app",
+    "dmg": "dist/Portlane-0.6.0-macOS-arm64.dmg",
+    "dmgSha256": "19216b4f10d035355ec256da788d82b1892646b2e6026b412f94dce4e20dc174",
+    "version": "0.6.0 (8)",
+    "releaseTag": "v0.6.0",
+    "releaseURL": "https://github.com/Tianyulife/portlane/releases/tag/v0.6.0"
+  },
+  "preserved": [
+    "Portlane brand and Steam companion navigation",
+    "Steam Play relay and per-game environment overrides",
+    "Game launch reports and focus return",
+    "Portlane spatial Wine download URL and digest"
+  ],
+  "skippedIntegrations": [
+    "live GPTK download and Apple import",
+    "public spatial Wine download",
+    "packaged Wine Bottle initialization",
+    "packaged Wine with real D3DMetal GPU fixtures",
+    "optional read-only local Steam account cache check"
+  ],
+  "pendingAcceptance": [
+    "real game exit/upload and second-device save consistency",
+    "quit confirmation buttons and cancel/resume behavior in a live Portlane session",
+    "live Steam environment restart while cloud upload is pending",
+    "real GPTK/game DLSS selection after NVAPI preparation",
+    "packaged-app interpolation, combat ghosting, HUD, input latency, long runs and multiple displays"
+  ],
+  "notes": [
+    "Upstream Wukong fixed-scene probe evidence is not counted as Portlane acceptance.",
+    "Wukong automatic CLR exception is removed along with its stale UI recommendation; default relay loading and explicit user overrides are covered by SteamClientHandoffTests. A new real-game acceptance run remains pending.",
+    "Cloud display components were removed at user request; backend lifecycle protection remains. Existing installations use the same bundle ID and data directory."
+  ],
+  "virtualDesktopCorrection": {
+    "date": "2026-10-11",
+    "reportedGame": "Black Myth: Wukong",
+    "reportedMode": "windowed",
+    "finding": "The bundled CrossOver Wine source explicitly disables desktop mode for winemac.drv in programs/winecfg/x11drvdlg.c:can_enable_desktop. Explorer /desktop does not supply a movable macOS desktop host.",
+    "changes": [
+      "Keep the virtual desktop switch fully available at the user's request.",
+      "Replace incorrect Retina/windowing guarantee with a macOS window-position limitation note and optional workaround.",
+      "Preserve saved configurations; no user game settings or Wine runtime modified."
+    ],
+    "validation": [
+      "Localization catalog check and git diff --check passed.",
+      "Release app build passed.",
+      "SteamDisplayPolicyTests: 1 passed.",
+      "Installed app signature verified; prior builds kept as ZIP archives to avoid duplicate app listings."
+    ],
+    "pending": [],
+    "userValidation": "User confirmed that Wukong works with virtual desktop disabled and has the positioning problem with it enabled.",
+    "followup": "Removed the UI re-enabling restriction at the user's request on 2026-10-11; the limitation notice remains."
+  }
+}

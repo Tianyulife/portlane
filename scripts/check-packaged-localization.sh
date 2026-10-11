@@ -11,7 +11,15 @@ ditto Config/Info.plist "$test_app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleExecutable LocalizationSmoke' "$test_app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier com.enginefuture.localization-smoke' "$test_app/Contents/Info.plist"
 ditto 'dist/Portlane.app/Contents/Resources/MacGamingUncle_IndieCore.bundle' "$test_app/Contents/Resources/MacGamingUncle_IndieCore.bundle"
-swiftc -parse-as-library -I "$bin_dir/Modules" -I Sources/CSQLite \
-  Fixtures/macOS/LocalizationSmoke.swift "$bin_dir"/IndieCore.build/*.o \
+if [[ -f "$bin_dir/IndieCore.o" ]]; then
+  module_dir="$bin_dir"
+  core_objects=("$bin_dir/IndieCore.o")
+else
+  module_dir="$bin_dir/Modules"
+  core_objects=("$bin_dir"/IndieCore.build/*.o(N))
+fi
+(( ${#core_objects} > 0 ))
+swiftc -parse-as-library -I "$module_dir" -I Sources/CSQLite \
+  Fixtures/macOS/LocalizationSmoke.swift "${core_objects[@]}" \
   -o "$test_app/Contents/MacOS/LocalizationSmoke" -lsqlite3
 "$test_app/Contents/MacOS/LocalizationSmoke"

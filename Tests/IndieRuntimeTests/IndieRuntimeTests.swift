@@ -605,9 +605,22 @@ final class IndieRuntimeTests: XCTestCase {
         ])
         XCTAssertEqual(relayed["MTL_HUD_ENABLED"], "1")
         XCTAssertEqual(relayed["WINE_WAIT_CHILD_PIPE_IGNORE"], "steam.exe")
-        XCTAssertEqual(relayed["WINEDLLOVERRIDES"], "d3d11,dxgi=n,b;mscoree,mshtml=;winedbg.exe=d")
+        XCTAssertEqual(relayed["WINEDLLOVERRIDES"], "d3d11,dxgi=n,b;winedbg.exe=d")
         XCTAssertNil(relayed["SteamAppId"])
         XCTAssertNil(relayed["SteamGameId"])
+    }
+
+    func testSteamRelayDoesNotDisableGameRuntimeImports() {
+        let defaults = SteamCompatibilityManager.relayEnvironment(for: [:])
+        XCTAssertEqual(defaults["WINEDLLOVERRIDES"], "winedbg.exe=d")
+        // A game may explicitly select Wine's mscoree implementation. Steam
+        // must not append a later, conflicting disable rule.
+        let configured = SteamCompatibilityManager.relayEnvironment(for: [
+            "WINEDLLOVERRIDES": "mscoree=b;mshtml=n,b;dxgi,d3d12=n,b",
+            "WINEMSYNC": "1"
+        ])
+        XCTAssertEqual(configured["WINEDLLOVERRIDES"], "mscoree=b;mshtml=n,b;dxgi,d3d12=n,b;winedbg.exe=d")
+        XCTAssertEqual(configured["WINEMSYNC"], "1")
     }
 
     func testSteamDefaultLaunchOptionIsUpdatedWithBackup() throws {
@@ -660,14 +673,26 @@ final class IndieRuntimeTests: XCTestCase {
         try Data("unix-nvngx".utf8).write(to: unix.appendingPathComponent("nvngx-on-metalfx.so"))
         try Data("windows-nvngx".utf8).write(to: windows.appendingPathComponent("nvngx-on-metalfx.dll"))
         try Data("nvapi".utf8).write(to: windows.appendingPathComponent("nvapi64.dll"))
+        try Data("unix-nvapi".utf8).write(to: unix.appendingPathComponent("nvapi64.so"))
         let bottle = BottleRecord(name: "MetalFX", root: root.appendingPathComponent("bottle"), runtimeID: "wine")
 
         try D3DMetalRendererPreparer.enableMetalFX(rendererRoot: renderer, version: "4.0b2", bottle: bottle)
         XCTAssertTrue(FileManager.default.fileExists(atPath: unix.appendingPathComponent("nvngx.so").path))
+        XCTAssertEqual(try Data(contentsOf: windows.appendingPathComponent("nvapi.dll")), Data("nvapi".utf8))
+        XCTAssertEqual(try Data(contentsOf: unix.appendingPathComponent("nvapi.so")), Data("unix-nvapi".utf8))
+        try D3DMetalRendererPreparer.enableMetalFX(rendererRoot: renderer, version: "4.0b2", bottle: bottle)
         XCTAssertEqual(
             try Data(contentsOf: bottle.root.appendingPathComponent("drive_c/windows/system32/nvngx.dll")),
             Data("windows-nvngx".utf8)
         )
+        // User-supplied aliases must survive subsequent preparation.
+        try Data("existing-nvapi".utf8).write(to: windows.appendingPathComponent("nvapi.dll"))
+        try Data("existing-unix-nvapi".utf8).write(to: unix.appendingPathComponent("nvapi.so"))
+        try D3DMetalRendererPreparer.enableMetalFX(rendererRoot: renderer, version: "4.0b2", bottle: bottle)
+        XCTAssertEqual(try Data(contentsOf: windows.appendingPathComponent("nvapi.dll")), Data("existing-nvapi".utf8))
+        XCTAssertEqual(try Data(contentsOf: unix.appendingPathComponent("nvapi.so")), Data("existing-unix-nvapi".utf8))
+        try FileManager.default.removeItem(at: unix.appendingPathComponent("nvapi64.so"))
+        XCTAssertThrowsError(try D3DMetalRendererPreparer.enableMetalFX(rendererRoot: renderer, version: "4.0b2", bottle: bottle))
     }
 
     func testD3DMetalPreparerInstallsNativeBridgeAndKeepsOriginalBackup() throws {

@@ -59,4 +59,23 @@ items(true,[{remote_client_id:'0',item_data:[{appid:4364910,completed:true}]}]);
 overview({remote_client_id:'0',update_appid:0,overall_percent_complete:0});
 assert.equal(window.__mguDownloads.items[0].progress,null);
 assert.equal(window.__mguDownloads.items[0].bytesPerSecond,null);
+// Current Steam schema, > 32-bit counters, and an overview preceding item delivery.
+items(true,[{remote_client_id:'0',item_data:[]}]);
+const total=134794763088,downloaded=64701486282;
+const stages=[{}, {}, {bytes_in_progress:downloaded,bytes_total:total}];
+overview({remote_client_id:'0',update_appid:2358720,overall_percent_complete:48,
+ update_state:'Downloading',progress:stages,update_network_bytes_per_second:46600000});
+items(true,[{remote_client_id:'0',item_data:[{appid:2358720,completed:false,
+ downloaded_bytes:85000000,total_bytes:1,update_type_info:[{progress:stages}]}]}]);
+assert.equal(window.__mguDownloads.items[0].progress,0.48);
+assert.equal(window.__mguDownloads.items[0].downloadedBytes,downloaded);
+assert.equal(window.__mguDownloads.items[0].totalBytes,total);
+assert.equal(window.__mguDownloads.items[0].bytesPerSecond,46600000);
+assert.equal(window.__mguDownloads.items[0].phase,'Downloading');
+items(true,[{remote_client_id:'other-device',item_data:[]}]);
+assert.equal(window.__mguDownloads.items[0].totalBytes,total);
+overview({remote_client_id:'0',update_appid:0,overall_percent_complete:0});
+items(true,[{remote_client_id:'0',item_data:[{appid:2358720,completed:false,downloaded_bytes:85000000,total_bytes:1}]}]);
+assert.equal(window.__mguDownloads.items[0].totalBytes,null,'Reject impossible totals instead of displaying 0 KB');
+assert.equal(window.__mguDownloads.items[0].downloadedBytes,null,'Byte pairs must use a single coherent source');
 console.log('PASS: remote deltas, queue acknowledgement, stale wizard, network errors, EULA, async continuation, completion cleanup');

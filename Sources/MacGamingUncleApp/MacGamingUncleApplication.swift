@@ -53,21 +53,74 @@ struct MacGamingUncleApplication: App {
 }
 
 @MainActor
-final class UncleApplicationDelegate: NSObject, NSApplicationDelegate {
+final class UncleApplicationDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     weak var model: MacGamingUncleAppModel?
     private var shutdownTask: Task<Void, Never>?
+    private var quitConfirmationWindow: NSWindow?
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if #available(macOS 26, *) { AutomaticFrameInterpolation.shared.shutdown() }
         guard let model else { return .terminateNow }
         if shutdownTask == nil {
             shutdownTask = Task { @MainActor in
-                await model.shutdownManagedSteam()
-                sender.reply(toApplicationShouldTerminate: true)
+                if await model.shutdownManagedSteam() {
+                    if #available(macOS 26, *) { AutomaticFrameInterpolation.shared.shutdown() }
+                    sender.reply(toApplicationShouldTerminate: true)
+                } else {
+                    self.showQuitConfirmation(sender)
+                }
             }
         }
         return .terminateLater
+    }
+
+    private func showQuitConfirmation(_ sender: NSApplication) {
+        let parent = sender.mainWindow
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 300),
+                              styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        window.title = L("Steam 仍需要运行")
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.contentView = NSHostingView(rootView: SteamQuitConfirmation(detail: model?.steamClientNotice ?? "") { [weak self] quitOnlyApp in
+            self?.finishQuitConfirmation(sender, quitOnlyApp: quitOnlyApp)
+        })
+        quitConfirmationWindow = window
+        if let parent { parent.beginSheet(window) }
+        else { window.center(); window.makeKeyAndOrderFront(nil) }
+    }
+
+    private func finishQuitConfirmation(_ sender: NSApplication, quitOnlyApp: Bool) {
+        guard let window = quitConfirmationWindow else { return }
+        quitConfirmationWindow = nil
+        window.sheetParent?.endSheet(window)
+        window.close()
+        shutdownTask = nil
+        if quitOnlyApp, #available(macOS 26, *) { AutomaticFrameInterpolation.shared.shutdown() }
+        sender.reply(toApplicationShouldTerminate: quitOnlyApp)
+    }
+
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        finishQuitConfirmation(NSApplication.shared, quitOnlyApp: false)
+        return false
+    }
+}
+
+private struct SteamQuitConfirmation: View {
+    let detail: String
+    let completion: (Bool) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(L("Steam 仍需要运行")).font(.system(size: 20, weight: .medium))
+            Text(L("游戏、云存档上传或客户端退出尚未确认。可取消退出继续等待，或仅退出 Portlane 并保留 Steam 后台运行。"))
+                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            if !detail.isEmpty { Text(detail).font(.caption).foregroundStyle(.secondary) }
+            HStack {
+                Spacer()
+                Button(L("退出应用，保留 Steam")) { completion(true) }
+                Button(L("取消退出，继续等待")) { completion(false) }.keyboardShortcut(.cancelAction)
+            }
+        }.padding(24).frame(width: 520).steamSurface()
     }
 }

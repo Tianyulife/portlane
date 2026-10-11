@@ -49,7 +49,7 @@ Portlane's workspace has three main pages: **Game configuration**, **Runtime com
 - Your own Steam account and licensed games.
 - Xcode 26 with a compatible Swift 6 toolchain to build the app. Features using macOS 26 APIs need SDK 26 or later to compile.
 
-Download the [Portlane 0.5.1 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/Portlane-0.5.1-macOS-arm64.dmg) and [spatial audio Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz). All assets and SHA-256 files are on the [Release page](https://github.com/Tianyulife/portlane/releases/tag/v0.5.1).
+Download the [Portlane 0.6.0 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.6.0/Portlane-0.6.0-macOS-arm64.dmg) and [spatial audio Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz). All assets and SHA-256 files are on the [Release page](https://github.com/Tianyulife/portlane/releases/tag/v0.6.0).
 
 1. Open the DMG, drag **Portlane** to **Applications**, then open it from that folder.
 2. Complete initial environment setup to automatically download and verify spatial audio Wine `11.0.9-services.1`.
@@ -84,19 +84,19 @@ For a distribution build, supply your own Developer ID using `MAC_GAMING_UNCLE_C
 4. Adjust settings as needed and click **Save**. Defaults and built-in game recommendations are a good starting point.
 5. Wait for **Steam Play relay connected**, then press **Play** in Windows Steam. Saved changes apply on the next launch.
 
-Save and exit your game before closing Portlane: quitting the manager also closes its managed Steam session.
+Save and exit your game before closing Portlane. The manager waits for matching Steam cloud-upload confirmation before closing its managed Steam session. If a game, download or upload is still pending, cancel quitting or quit only Portlane and leave Steam running. See [Steam lifecycle protection](docs/STEAM_CLOUD_LIFECYCLE.md).
 
 ## Compatibility settings
 
-- **Graphics and performance:** renderer, synchronization, virtual desktop and resolution, Apple Metal HUD, MetalFX/DLSS mapping, and Metal 4 preferences.
+- **Graphics and performance:** renderer, synchronization, virtual desktop and resolution, Apple Metal HUD, MetalFX/DLSS mapping, and Metal 4 preferences. The virtual desktop switch remains available with a note about the current macOS engine: the game may be stuck in the upper-left corner and unable to move. If this occurs, disable the option, save, and restart the game.
 - **Compatibility rules:** per-game DLL loading overrides and environment variables. Steam launch arguments remain in Steam's game properties; local EXE arguments are managed in Portlane.
 - **Input and audio:** controller options, spatial audio runtime support, and per-game diagnostics, with device management in **Mac controllers**.
 - **Runtime components:** install, import, select, and inspect Wine and graphics components, plus advanced Bottle and directory tools.
 - **Diagnostics:** system checks, Steam Play relay connection, launch errors, and runtime logs.
 
-Steam games currently share a Steam Bottle, while each game's configuration is saved separately. Global changes to that Bottle can affect every game inside it. Applying conflicting launch environments can require restarting Steam; Portlane prevents this restart while a game is running or a download is active. Imported local programs use separate Bottles.
+Steam games currently share a Steam Bottle, while each game's configuration is saved separately. Global changes to that Bottle can affect every game inside it. Applying conflicting launch environments can require restarting Steam; Portlane prevents this restart while a game is running, a download is active or a tracked cloud upload is unconfirmed. Imported local programs use separate Bottles.
 
-**Black Myth: Wukong** retains a verified built-in `mscoree=b` compatibility rule. **Restore recommended** clears custom overrides while preserving the game's built-in preset. Local testing has validated Steam launch handoff and gameplay, including spatial audio rendering; this is not a guarantee for every Mac, game version, or audio device.
+**Black Myth: Wukong** now uses default Wine loading for CLR DLLs: the shared Steam process no longer disables them, so an automatic `mscoree=b` exception is unnecessary. **Restore recommended** clears custom overrides. Earlier local testing validated Steam launch handoff and gameplay, including spatial audio rendering; the updated default loading still needs a fresh game run.
 
 MetalFX/DLSS mapping and universal frame interpolation are experimental and off by default. DLSS mapping requires game support; the interpolation prototype requires macOS 26 and does not guarantee doubled frame rate. See the [interpolation notes](docs/FRAME_INTERPOLATION.md) and [spatial audio notes](docs/SPATIAL_AUDIO.md).
 
@@ -125,7 +125,7 @@ swift build -c release
 swift run macgamingunclectl --json doctor
 ```
 
-The latest local Swift suite completed 118 tests with four optional integration skips and no failures. Relay regression tests cover interception, duplicate requests, unmanaged calls, reconnection, and lease expiry. Release builds and packaged resource/signature checks also passed. These checks do not establish compatibility with every Steam or game update.
+The latest local Swift suite completed 149 tests with five optional integration skips and no failures. Relay regression tests cover interception, duplicate requests, unmanaged calls, reconnection, and lease expiry. Release builds and packaged resource/signature checks also passed. These checks do not establish compatibility with every Steam or game update.
 
 More details: [architecture](docs/ARCHITECTURE.md), [runtime supply chain](docs/RUNTIME_SUPPLY_CHAIN.md), [testing](docs/TESTING.md), [GPTK distribution](docs/GPTK_DISTRIBUTION.md).
 

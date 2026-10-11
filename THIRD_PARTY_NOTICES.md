@@ -26,3 +26,11 @@ artwork is not covered by the project's Apache source-code license. Portlane is
 not affiliated with Valve or Apple.
 
 Runtime releases must include exact notices and corresponding-source links for their pinned versions.
+
+Portlane retains the Apache-2.0 Mac Gaming Uncle source history and attribution.
+The 2026-10-11 lifecycle, runtime preparation and frame-presentation port adapts
+upstream author tabshi's commits `bf1ada9b6c2e857c639534595772a20cb2ff19b4`,
+`2db077053c8646ca19124339fc0ad91c8c36a672` and
+`2cd8d61e65ccb04ffcec0f85d5156b1c5ddcab12` from
+https://github.com/enginefuture/mac-gaming-uncle. Portlane-specific adaptations
+and validation are recorded in `docs/UPSTREAM_PORT_PLAN.md`.

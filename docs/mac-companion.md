@@ -6,7 +6,7 @@ The local app now owns compatibility settings rather than reproducing Steam's st
 
 | Entry | Retained features |
 | --- | --- |
-| Game configuration | Installed/updating Steam game selector, local EXE import and launch, renderer selection, Metal HUD/MetalFX/Metal 4, synchronization, Wine virtual desktop and resolution, interpolation panel, per-game DLL overrides and environment variables, controller bridging/rumble, spatial audio diagnostics |
+| Game configuration | Installed/updating Steam game selector, local EXE import and launch, renderer selection, Metal HUD/MetalFX/Metal 4, synchronization, Wine virtual desktop switch and resolution with a macOS window-position limitation note, interpolation panel, per-game DLL overrides and environment variables, controller bridging/rumble, spatial audio diagnostics |
 | Runtime components | Wine install/import/select/delete, GPTK install/cancel/import, DXMT/DXVK/VKD3D import, Bottle directories, Windows Steam installation, link to official Steam downloads |
 | Diagnostics | System checks and refresh, Steam Play relay status/errors, per-game launch status, runtime log folder |
 | Mac controllers | Device discovery and existing controller tools, opened from the sidebar |
@@ -29,7 +29,7 @@ Keep the Mac manager open and wait for “Steam Play relay connected” before p
 
 `GameConfiguration` has optional DLL overrides and environment variables; existing saved configurations decode without migration. DLL overrides are merged after renderer/recipe defaults. Reserved Bottle, Steam identity and host-path fields cannot be overwritten through the environment editor. Invalid names, duplicate UI keys and unsafe values fail validation before saving.
 
-Wukong AppID 2358720 keeps its verified built-in `mscoree=b` rule. “Restore recommended” clears user overrides while retaining this runtime preset. Ordinary games retain the previous default DLL rules. Local programs retain their separate Bottles and launch arguments.
+As of the 2026-10-11 upstream port, Wukong AppID 2358720 uses default Wine CLR loading, like other games. Shared Steam no longer disables `mscoree/mshtml`, so no automatic `mscoree=b` exception is needed. “Restore recommended” clears user overrides. Explicit user DLL choices remain supported. Local programs retain their separate Bottles and launch arguments.
 
 ## Verification
 

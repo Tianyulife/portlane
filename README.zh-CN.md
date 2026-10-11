@@ -49,7 +49,7 @@ Portlane 的空间音频运行时支持游戏通过 **Windows Spatial Audio** �
 - 自己的 Steam 账户与合法拥有的游戏。
 - 从源码构建需要 Xcode 26 和兼容的 Swift 6 工具链。涉及 macOS 26 API 的功能需要 SDK 26 或更高版本才能编译。
 
-下载 [Portlane 0.5.1 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/Portlane-0.5.1-macOS-arm64.dmg) 和 [空间音频 Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz)。完整资源与 SHA-256 校验文件见 [Release 页面](https://github.com/Tianyulife/portlane/releases/tag/v0.5.1)。
+下载 [Portlane 0.6.0 DMG](https://github.com/Tianyulife/portlane/releases/download/v0.6.0/Portlane-0.6.0-macOS-arm64.dmg) 和 [空间音频 Wine 11.0.9-services.1](https://github.com/Tianyulife/portlane/releases/download/v0.5.1/portlane-wine-11.0.9-services.1-macos-x86_64.tar.xz)。完整资源与 SHA-256 校验文件见 [Release 页面](https://github.com/Tianyulife/portlane/releases/tag/v0.6.0)。
 
 1. 打开 DMG，将 **Portlane** 拖到 **Applications（应用程序）**，再从应用程序目录打开。
 2. 完成首次环境准备，应用自动下载并校验空间音频 Wine `11.0.9-services.1`。
@@ -84,11 +84,11 @@ scripts/build-dmg.sh
 4. 按需调整配置，点击 **保存**。第一次运行可以先使用默认值和内置推荐。
 5. 等待 **Steam 启动衔接已连接**，然后在 Windows Steam 中点击 **开始游戏**。配置修改在下次启动时生效。
 
-关闭 Portlane 前先保存并退出游戏：退出管理应用也会关闭它管理的 Steam 会话。
+关闭 Portlane 前先保存并退出游戏。管理器会等待匹配的 Steam 云存档上传确认，再关闭它管理的 Steam 会话；游戏、下载或上传尚未结束时，可取消退出，或仅退出 Portlane 并保留 Steam 运行。详见 [Steam 生命周期保护](docs/STEAM_CLOUD_LIFECYCLE.md)。
 
 ## 可以调整什么
 
-- **图形与性能：** 渲染后端、同步方式、虚拟桌面及分辨率、Apple Metal HUD、MetalFX/DLSS 映射和 Metal 4 偏好。
+- **图形与性能：** 渲染后端、同步方式、虚拟桌面及分辨率、Apple Metal HUD、MetalFX/DLSS 映射和 Metal 4 偏好。保留虚拟桌面开关并说明当前 macOS 引擎的限制：画面可能固定在左上角、无法移动，遇到此问题可关闭并保存后重启游戏。
 - **兼容规则：** 每游戏独立的 DLL 加载规则和环境变量。Steam 游戏的启动参数仍在 Steam 游戏属性中设置，本地 EXE 参数由 Portlane 管理。
 - **输入与音频：** 手柄选项、空间音频运行时支持与逐游戏诊断；设备管理在 **Mac 手柄** 页面中进行。
 - **运行组件：** Wine 和图形组件的安装、导入、选择与检查，以及高级 Bottle 和本地目录工具。
@@ -96,7 +96,7 @@ scripts/build-dmg.sh
 
 目前 Steam 游戏共享一个 Steam Bottle，但各游戏配置分别保存。修改 Bottle 全局环境可能影响其中所有游戏；启动配置冲突时可能需要重启 Steam，有游戏正在运行或正在下载时，Portlane 会阻止这类重启。本地导入的程序使用独立 Bottle。
 
-**黑神话：悟空** 保留已验证的内置 `mscoree=b` 兼容规则。**恢复推荐** 会清除自定义覆盖，同时保留游戏内置规则。本地已验证 Steam 启动衔接和游戏运行，包括空间音频渲染；该结果不能保证所有 Mac、游戏版本或音频设备都有相同表现。
+**黑神话：悟空** 现在使用 Wine 默认的 CLR DLL 加载策略：共享 Steam 进程不再禁用这些 DLL，无需自动追加 `mscoree=b` 特例。**恢复推荐** 会清除自定义覆盖。此前本地已验证 Steam 启动衔接和游戏运行，包括空间音频渲染；更新后的默认加载策略仍需重新进行实机游戏验证。
 
 MetalFX/DLSS 映射与通用插帧属于实验功能，默认关闭。DLSS 映射需要游戏自身支持；插帧原型需要 macOS 26，不保证帧率翻倍。详见 [插帧说明](docs/FRAME_INTERPOLATION.md) 与 [空间音频说明](docs/SPATIAL_AUDIO.md)。
 
@@ -125,7 +125,7 @@ swift build -c release
 swift run macgamingunclectl --json doctor
 ```
 
-最近一次本地 Swift 测试执行 118 项，4 项可选集成测试跳过，无失败。启动衔接回归测试覆盖拦截、重复请求、非受管理调用、重连和租约过期；Release 构建及打包资源、签名检查也已通过。这些验证不代表所有 Steam 更新与游戏版本都兼容。
+最近一次本地 Swift 测试执行 149 项，5 项可选集成测试跳过，无失败。启动衔接回归测试覆盖拦截、重复请求、非受管理调用、重连和租约过期；Release 构建及打包资源、签名检查也已通过。这些验证不代表所有 Steam 更新与游戏版本都兼容。
 
 更多资料：[架构说明](docs/ARCHITECTURE.md)、[运行时供应链](docs/RUNTIME_SUPPLY_CHAIN.md)、[测试指南](docs/TESTING.md)、[GPTK 下载与导入](docs/GPTK_DISTRIBUTION.md)。
 

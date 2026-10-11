@@ -21,6 +21,10 @@
 "无需游戏支持 DLSS。开启一次后自动跟随游戏窗口，默认关闭；不改变分辨率或鼠标坐标。需要 macOS 26。" = "No game DLSS support required. Enable once to follow its window automatically; off by default. Does not change resolution or pointer coordinates. Requires macOS 26.";
 "显示器或缩放变化，插帧停止；请重新选择窗口" = "Display or scaling changed; interpolation stopped. Select the window again.";
 "通用插帧（实验）" = "Universal Frame Interpolation (Experimental)";
+"插帧最高以 30 FPS、1280×720 捕获，目标为 2× 输出，再放大到原窗口尺寸；游戏分辨率保持不变。持续超时则显示原画面。" = "Interpolation captures up to 30 FPS at 1280×720, targets 2× output and upscales to the original window size. Game resolution is unchanged. Sustained overruns show the original image.";
+"提交帧数不是实测显示 FPS。窗口变形、切出游戏或设备处理失败时自动停止。呈现计数来自显示回调，仍不代表游戏逻辑帧率。" = "Submitted frame counts are not measured display FPS. Stops on window changes, focus loss or processing failure. Presentation counts come from display callbacks and are not game simulation FPS.";
+"插帧输出调整中；持续超时则显示原画面" = "Adjusting interpolation timing; sustained overruns show the original image";
+"设备未及时生成插帧，已保留原画面" = "Device did not generate frames in time; original image retained";
 "为此游戏启用 2× 插帧" = "Enable 2× interpolation for this game";
 "只处理游戏画面，不录音、不改 DPI。插帧提高显示流畅度，不提高游戏逻辑帧率；可能增加延迟和 HUD 重影。" = "Processes video only; no audio capture or DPI changes. Interpolation improves visual smoothness, not game simulation speed, and may add latency or HUD artifacts.";
 "首版仅支持窗口／无边框模式，不支持独占全屏。先显示游戏窗口，再刷新列表。" = "This version supports windowed and borderless modes, not exclusive fullscreen. Show the game window before refreshing the list.";
@@ -283,7 +287,7 @@
 "保存" = "Save";
 "显示" = "Display";
 "使用 Wine 虚拟桌面" = "Use a Wine Virtual Desktop";
-"为这个游戏创建固定尺寸的 Windows 桌面，可避免 Retina 缩放导致的画面拉伸和鼠标错位。" = "Create a fixed-size Windows desktop for this game to avoid stretching and pointer offsets from Retina scaling.";
+"当前 macOS 引擎下，Wine 虚拟桌面可能使画面固定在左上角、无法移动。遇到此问题可关闭此选项，保存后重启游戏。" = "With the current macOS engine, a Wine virtual desktop may leave the game stuck in the upper-left corner and unable to move. If this occurs, turn off this option, save, and restart the game.";
 "宽度" = "Width";
 "高度" = "Height";
 "像素" = "px";
@@ -394,7 +398,7 @@
 "刷新商店" = "Refresh Store";
 "STEAM 精选" = "STEAM FEATURED";
 "添加并安装" = "Add and Install";
-"查看详情" = "View Details";
+"查看详情" = "Show details";
 "%@ 款" = "%@ titles";
 "免费游玩" = "Free to Play";
 "查看价格" = "View Price";
@@ -596,84 +600,6 @@
 "重试安装" = "Retry Installation";
 "Steam 尚未联机，请打开 Steam 客户端恢复连接后重试" = "Steam is not connected. Open Steam to restore the connection, then retry";
 "Steam 未联机" = "Steam disconnected";
-
-"正在运行" = "Running";
-
-"当前使用" = "Current selection";
-
-"使用此版本" = "Use this version";
-
-"删除 Wine 版本？" = "Delete Wine version?";
-
-"当前使用的版本用于下一次启动；切换前请先退出游戏和 Windows Steam。删除会移到废纸篓，保留游戏和容器。" = "The selected version is used on the next launch. Quit games and Windows Steam before switching. Deleted versions move to Trash; games and bottles are kept.";
-
-"将 %@ 移到废纸篓。游戏和容器不会被删除。" = "Move %@ to Trash. Games and bottles will be kept.";
-
-"正在切换 Wine…" = "Switching Wine…";
-
-"请先退出游戏和 Windows Steam，再切换 Wine" = "Quit games and Windows Steam before switching Wine";
-
-"游戏引擎只能选择 Portlane Wine 版本" = "Select a Portlane Wine version for the game engine";
-
-"Wine 已切换为 %@" = "Wine switched to %@";
-
-"正在删除 Wine…" = "Deleting Wine…";
-
-"请先切换到其他 Wine，再删除当前使用的版本" = "Switch to another Wine before deleting the current selection";
-
-"Wine 已移到废纸篓，游戏和容器已保留" = "Wine moved to Trash; games and bottles kept";
-
-"只能删除应用管理的已安装 Wine 版本" = "Only installed Wine versions managed by this app can be deleted";
-
-"这个 Wine 仍在运行，请先退出游戏和 Windows Steam" = "This Wine is still running. Quit games and Windows Steam first";
-
-"正在搜索 Steam 商店…" = "Searching the Steam store…";
-
-"搜索失败" = "Search failed";
-
-"没有找到匹配的游戏" = "No matching games";
-
-"请输入至少两个字符" = "Enter at least two characters";
-
-"试试游戏的英文名或更短的关键词" = "Try the English title or a shorter search term";
-
-"即将搜索…" = "Search starting…";
-
-"返回精选" = "Back to featured";
-
-"精选游戏" = "Featured games";
-
-"没有匹配的游戏" = "No matching games";
-
-"调整搜索关键词或筛选条件" = "Change your search or filters";
-
-"显示全部游戏" = "Show all games";
-
-"正在补全游戏名称与封面…" = "Loading game names and artwork…";
-
-"兼容性需实测" = "Compatibility needs testing";
-
-"Steam 已连接" = "Steam connected";
-
-"在 Steam 中获取" = "Get it in Steam";
-
-"上一组游戏" = "Previous games";
-
-"下一组游戏" = "Next games";
-
-"你的游戏" = "Your games";
-
-"商店分类" = "Store category";
-
-"清除搜索" = "Clear search";
-
-"游戏库筛选" = "Library filter";
-
-"最小化窗口" = "Minimize Window";
-
-"最大化或恢复窗口" = "Zoom / Restore Window";
-
-"进入或退出全屏" = "Enter / Exit Full Screen";
 "本地程序" = "Local program";
 "游戏配置" = "Game configuration";
 "调整游戏在 Mac 上的运行方式" = "Configure how games run on your Mac";
@@ -711,14 +637,23 @@
 "全局偏好设置" = "Global preferences";
 "商店、游戏库与下载\n由 Windows Steam 管理" = "Store, library and downloads\nmanaged by Windows Steam";
 "保持 Mac 管理器打开，Steam 的开始游戏操作会先应用单游戏配置" = "Keep the Mac manager open to apply game configurations before Steam Play";
+"当前使用的版本用于下一次启动；切换前请先退出游戏和 Windows Steam。删除会移到废纸篓，保留游戏和容器。" = "The selected version is used on the next launch. Quit games and Windows Steam before switching. Deleted versions move to Trash; games and bottles are kept.";
+"删除 Wine 版本？" = "Delete Wine version?";
 "删除" = "Delete";
+"将 %@ 移到废纸篓。游戏和容器不会被删除。" = "Move %@ to Trash. Games and bottles will be kept.";
+"正在运行" = "Running";
+"当前使用" = "Current selection";
+"使用此版本" = "Use this version";
+"兼容性需实测" = "Compatibility needs testing";
+"Steam 已连接" = "Steam connected";
+"你的游戏" = "Your games";
+"上一组游戏" = "Previous games";
+"下一组游戏" = "Next games";
 "恢复推荐" = "Restore recommended";
 "图形与性能" = "Graphics and performance";
 "兼容规则" = "Compatibility rules";
 "输入与音频" = "Input and audio";
 "DLL 加载规则" = "DLL load rules";
-"推荐：Wine 内置" = "Recommended: Wine built-in";
-"黑神话：悟空需要此 DLL。恢复推荐会保留已验证的内置兼容规则。" = "Black Myth: Wukong requires this DLL. Restoring recommended settings preserves the verified built-in compatibility rule.";
 "未覆盖的 DLL 使用渲染组件与内置兼容规则。" = "DLLs without custom overrides use renderer and built-in compatibility rules.";
 "DLL 名称" = "DLL name";
 "加载方式" = "Load order";
@@ -743,8 +678,36 @@
 "DLL 名称不能重复：%@" = "Duplicate DLL name: %@";
 "环境变量需要使用 NAME=VALUE 格式" = "Environment variables must use NAME=VALUE format";
 "环境变量名称不能重复：%@" = "Duplicate environment variable: %@";
+"正在切换 Wine…" = "Switching Wine…";
+"请先退出游戏和 Windows Steam，再切换 Wine" = "Quit games and Windows Steam before switching Wine";
+"游戏引擎只能选择 Portlane Wine 版本" = "Select a Portlane Wine version for the game engine";
+"Wine 已切换为 %@" = "Wine switched to %@";
+"正在删除 Wine…" = "Deleting Wine…";
+"请先切换到其他 Wine，再删除当前使用的版本" = "Switch to another Wine before deleting the current selection";
+"Wine 已移到废纸篓，游戏和容器已保留" = "Wine moved to Trash; games and bottles kept";
 "正在打开 Steam 游戏属性…" = "Opening Steam game properties…";
 "此游戏需要切换 Steam 运行环境，请先暂停 Steam 下载再启动" = "This game requires a different Steam environment. Pause Steam downloads before playing";
+"正在搜索 Steam 商店…" = "Searching the Steam store…";
+"搜索失败" = "Search failed";
+"没有找到匹配的游戏" = "No matching games";
+"请输入至少两个字符" = "Enter at least two characters";
+"试试游戏的英文名或更短的关键词" = "Try the English title or a shorter search term";
+"即将搜索…" = "Search starting…";
+"返回精选" = "Back to featured";
+"商店分类" = "Store category";
+"清除搜索" = "Clear search";
+"在 Steam 中获取" = "Get it in Steam";
+"精选游戏" = "Featured games";
+"没有匹配的游戏" = "No matching games";
+"调整搜索关键词或筛选条件" = "Change your search or filters";
+"显示全部游戏" = "Show all games";
+"正在补全游戏名称与封面…" = "Loading game names and artwork…";
+"游戏库筛选" = "Library filter";
+"最小化窗口" = "Minimize Window";
+"最大化或恢复窗口" = "Zoom / Restore Window";
+"进入或退出全屏" = "Enter / Exit Full Screen";
+"只能删除应用管理的已安装 Wine 版本" = "Only installed Wine versions managed by this app can be deleted";
+"这个 Wine 仍在运行，请先退出游戏和 Windows Steam" = "This Wine is still running. Quit games and Windows Steam first";
 "兼容设置最多允许 64 项" = "Compatibility settings allow up to 64 entries";
 "环境变量无效或由运行管理器保留：%@" = "Invalid or reserved environment variable: %@";
 "DLL 名称无效：%@" = "Invalid DLL name: %@";
@@ -764,7 +727,6 @@
 "文件夹名称" = "Folder name";
 "请选择文件夹路径" = "Enter a folder path";
 "文件夹名称无效" = "Invalid folder name";
-
 "返回当前游戏" = "Return to current game";
 "检查游戏文件与运行组件" = "Checking game files and runtime components";
 "分析游戏兼容性与图形后端" = "Analyzing compatibility and graphics backend";
@@ -794,3 +756,27 @@
 "等待启动衔接" = "Waiting for Play relay";
 "打开 Steam" = "Open Steam";
 "手柄管理" = "Controllers";
+"等待 Steam 提供下载大小…" = "Waiting for download size from Steam…";
+"云存档：游戏运行中" = "Cloud saves: game running";
+"云存档：Steam 待连接" = "Cloud saves: Steam disconnected";
+"云存档状态未确认" = "Cloud save status unconfirmed";
+"正在检查云存档…" = "Checking cloud saves…";
+"正在下载云存档…" = "Downloading cloud saves…";
+"正在上传云存档…" = "Uploading cloud saves…";
+"Steam 已确认云存档同步" = "Steam confirmed cloud save sync";
+"云存档同步失败，请查看 Steam" = "Cloud save sync failed; check Steam";
+"正在等待 Steam 上传云存档…" = "Waiting for Steam to upload cloud saves…";
+"云存档上传尚未确认，已保留 Steam；请打开 Steam 客户端检查同步状态后重试" = "Cloud upload is unconfirmed. Steam has been kept running; check sync in the Steam client and retry.";
+"云同步或游戏状态尚未确认，Steam 将继续运行" = "Cloud sync or game status is unconfirmed; Steam will keep running";
+"Steam 仍需要运行" = "Steam needs to keep running";
+"游戏、云存档上传或客户端退出尚未确认。可取消退出继续等待，或仅退出 Portlane 并保留 Steam 后台运行。" = "Game, cloud upload, or client shutdown is unconfirmed. Cancel quitting to keep waiting, or quit only Portlane and leave Steam running in the background.";
+"取消退出，继续等待" = "Cancel quitting and keep waiting";
+"退出应用，保留 Steam" = "Quit app and keep Steam running";
+"Steam 显示配置" = "Steam display configuration";
+"Steam 中文字体注册" = "Steam CJK font registration";
+"正在配置 Steam 显示…" = "Configuring Steam display…";
+"%@（已清理残留进程并重试；诊断日志：%@）" = "%@ (stale processes cleared and retried; diagnostic log: %@)";
+"显示层未实际呈现画面，已恢复原画面" = "Display presentation stalled; the original game view has been restored.";
+"Steam 下载状态尚未确认，请在 Steam 中检查后重试" = "Steam download status is unconfirmed. Check in Steam and retry.";
+"Steam 仍有活动下载，请先暂停下载后重试" = "Steam still has active downloads. Pause them before retrying.";
+"尚未确认" = "Not yet confirmed";

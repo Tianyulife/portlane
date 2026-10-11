@@ -32,6 +32,12 @@ public enum D3DMetalRendererPreparer {
         let aliases = [
             (unix.appendingPathComponent("nvngx-on-metalfx.so"), unix.appendingPathComponent("nvngx.so")),
             (windows.appendingPathComponent("nvngx-on-metalfx.dll"), windows.appendingPathComponent("nvngx.dll")),
+            // GPTK's 64-bit NVAPI PE declares its Wine builtin name as
+            // nvapi.dll. Wine resolves the builtin/Unix companion by that
+            // name, not the public nvapi64.dll filename. Without both aliases
+            // DllMain fails (ERROR_DLL_INIT_FAILED) and games hide DLSS.
+            (windows.appendingPathComponent("nvapi64.dll"), windows.appendingPathComponent("nvapi.dll")),
+            (unix.appendingPathComponent("nvapi64.so"), unix.appendingPathComponent("nvapi.so")),
         ]
         for (source, target) in aliases {
             guard fileManager.fileExists(atPath: source.path) else {

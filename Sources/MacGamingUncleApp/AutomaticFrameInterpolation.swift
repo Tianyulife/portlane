@@ -122,6 +122,15 @@ final class AutomaticFrameInterpolation: ObservableObject {
             let candidate = process.flatMap { Self.window(for: $0.pid, in: windows) }
             let key = candidate.map { "\($0.id):\($0.frame.width)x\($0.frame.height):\(topology)" }
             let focused = process != nil && foreground == process?.pid
+            // An active stream's 250 ms watchdog validates its exact window,
+            // geometry and bounded offscreen recovery. A missing candidate in
+            // this on-screen-only list must not bypass that visibility gate.
+            // Process, focus and permission changes still stop immediately below.
+            if let owner, owner.game == game, owner.run == process?.identity,
+               focused, permission, service.active, candidate == nil {
+                setStatus(game, service.status)
+                continue
+            }
             let observedRun = matches.count > 1 ? state.run : process?.identity
             let decision = state.observe(run: observedRun, window: key, foreground: focused)
             states[game] = state
@@ -168,7 +177,8 @@ final class AutomaticFrameInterpolation: ObservableObject {
     private static func window(for pid: Int32, in windows: [[String: Any]]) -> (id: CGWindowID, frame: CGRect)? {
         let candidates: [(id: CGWindowID, frame: CGRect)] = windows.compactMap { info in
             guard (info[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == pid,
-                  (info[kCGWindowLayer as String] as? Int) == 0,
+                  let layer = info[kCGWindowLayer as String] as? Int,
+                  FrameInterpolationWindowLayer.isEligible(layer),
                   let number = info[kCGWindowNumber as String] as? NSNumber,
                   let raw = info[kCGWindowBounds as String] as? NSDictionary,
                   let frame = CGRect(dictionaryRepresentation: raw), frame.width >= 640, frame.height >= 360 else { return nil }

@@ -1,5 +1,28 @@
 # Universal frame interpolation — experimental, opt-in
 
+## Portlane source update — 2026-10-11
+
+Portlane now adapts upstream `2cd8d61`'s display-link presentation and safeguards.
+Capture is capped at 30 FPS and processing at a fitted 1280×720 budget, aligned to
+16 pixels; MetalFX Spatial upscales to the original window's physical output size.
+Game resolution and Wine DPI stay unchanged. The owned capture pool and GPU queue
+are bounded, only the latest pending image is processed, and duplicate/scene-cut
+analysis runs outside the UI thread.
+
+Actual presentation uses `CAMetalDisplayLink`. Submitted/generated images are
+reported separately from distinct drawable presentations and game FPS. A stalled
+display or sustained inference overrun restores the original game view. Visibility
+loss hides output immediately, allows at most one second for same-window recovery,
+and invalidates work spanning the gap. Focus, process, geometry and display changes
+retain the stop/revalidation behavior. Manual stop still suppresses automatic
+restart during that run. Final diagnostics survive teardown.
+
+The feature remains default-off, macOS 26+, SDR and windowed/borderless only.
+Portlane's current validation is recorded in `validation/portlane-upstream-port-20261011.json`.
+Upstream Wukong probes do not establish Portlane packaged-app acceptance, combat
+quality, input latency, multi-display compatibility or stable 60 FPS. The earlier
+laboratory history below is retained as context, not evidence for this build.
+
 Included in the 0.4.0 research preview. The application exposes 2× only, off by
 default. Internal 4×/static-detail laboratory APIs are not enabled by the UI.
 

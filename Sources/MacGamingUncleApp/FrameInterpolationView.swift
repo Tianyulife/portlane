@@ -25,6 +25,8 @@ struct FrameInterpolationView: View {
             Toggle(L("游戏启动后自动跟随窗口启用 2× 插帧"), isOn: enabled)
             Text(L("只处理游戏画面，不录音、不改 DPI。插帧提高显示流畅度，不提高游戏逻辑帧率；可能增加延迟和 HUD 重影。"))
                 .font(.callout).foregroundStyle(.secondary)
+            Text(L("插帧最高以 30 FPS、1280×720 捕获，目标为 2× 输出，再放大到原窗口尺寸；游戏分辨率保持不变。持续超时则显示原画面。"))
+                .font(.callout).foregroundStyle(.secondary)
             Text(L("支持窗口／无边框模式。启动游戏后自动匹配；切出暂停、返回恢复。手动停止后，本次游戏运行不再自动开启。"))
                 .font(.caption).foregroundStyle(.secondary)
             Text(automatic.statuses[gameID] ?? L("开启后等待游戏启动，无需手动选择窗口"))
@@ -52,7 +54,7 @@ struct FrameInterpolationView: View {
             Divider()
             Text(service.status).textSelection(.enabled)
             Text(service.metrics).font(.caption.monospaced()).textSelection(.enabled)
-            Text(L("提交帧数不是实测显示 FPS。窗口变形、切出游戏或设备处理失败时自动停止；不会静默降低画质。"))
+            Text(L("提交帧数不是实测显示 FPS。窗口变形、切出游戏或设备处理失败时自动停止。呈现计数来自显示回调，仍不代表游戏逻辑帧率。"))
                 .font(.caption).foregroundStyle(.secondary)
         }
         .padding(24)

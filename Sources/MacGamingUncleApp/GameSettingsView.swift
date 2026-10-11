@@ -118,7 +118,7 @@ struct GameSettingsView: View {
                 }
                 SteamSettingsSection(title: L("显示")) {
                     Toggle(L("使用 Wine 虚拟桌面"), isOn: $useVirtualDesktop)
-                    Text(L("为这个游戏创建固定尺寸的 Windows 桌面，可避免 Retina 缩放导致的画面拉伸和鼠标错位。"))
+                    Text(L("当前 macOS 引擎下，Wine 虚拟桌面可能使画面固定在左上角、无法移动。遇到此问题可关闭此选项，保存后重启游戏。"))
                         .font(.caption).foregroundStyle(.secondary)
                     HStack {
                         TextField(L("宽度"), text: $width).frame(width: 100)
@@ -144,11 +144,7 @@ struct GameSettingsView: View {
                 }
                 if category == 1 {
                     SteamSettingsSection(title: L("DLL 加载规则")) {
-                        if steamAppID == 2358720 {
-                            HStack { Text("mscoree").font(.system(.body, design: .monospaced)); Spacer(); Text(L("推荐：Wine 内置")).foregroundStyle(IndiePalette.green) }
-                            Text(L("黑神话：悟空需要此 DLL。恢复推荐会保留已验证的内置兼容规则。"))
-                                .font(.caption).foregroundStyle(.secondary)
-                        } else { Text(L("未覆盖的 DLL 使用渲染组件与内置兼容规则。")).font(.caption).foregroundStyle(.secondary) }
+                        Text(L("未覆盖的 DLL 使用渲染组件与内置兼容规则。")).font(.caption).foregroundStyle(.secondary)
                         ForEach($dllRows) { $row in
                             HStack {
                                 TextField(L("DLL 名称"), text: $row.name).frame(maxWidth: 220)
